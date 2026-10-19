@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +17,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
 import { formatDropshippingTaka } from '../api/homeApi';
 import { downloadDropshippingImage } from '../api/imageDownload';
-import { useDropshippingProductDetailsQuery } from '../api/queries';
+import {
+  dropshippingHomeQueryKeys,
+  useDropshippingProductDetailsQuery,
+  useDropshippingWishlistQuery,
+} from '../api/queries';
+import {
+  addDropshippingWishlistProduct,
+  removeDropshippingWishlistProduct,
+} from '../api/wishlistApi';
+import { useAppSelector } from '../../../store/hooks';
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -25,9 +34,12 @@ function firstParam(value: string | string[] | undefined): string {
 
 export function DropshippingProductDetailsScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const productId = firstParam(params.id);
   const productQuery = useDropshippingProductDetailsQuery(productId);
+  const wishlistQuery = useDropshippingWishlistQuery();
   const { width: screenWidth } = useWindowDimensions();
   const product = productQuery.data;
   const images = product?.images?.length
@@ -66,6 +78,27 @@ export function DropshippingProductDetailsScreen() {
       );
     },
     onSuccess: () => Alert.alert('ছবি সংরক্ষিত', 'পণ্যের ছবি গ্যালারিতে সেভ হয়েছে।'),
+  });
+  const isWishlisted = wishlistQuery.data?.some((item) => item.id === productId) ?? false;
+  const wishlistMutation = useMutation({
+    mutationFn: () => isWishlisted
+      ? removeDropshippingWishlistProduct(productId)
+      : addDropshippingWishlistProduct(productId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: dropshippingHomeQueryKeys.wishlist(userId ?? ''),
+      });
+      Alert.alert(
+        isWishlisted ? 'উইশলিস্ট থেকে সরানো হয়েছে' : 'উইশলিস্টে যোগ হয়েছে',
+        isWishlisted ? 'পণ্যটি আপনার পছন্দের তালিকা থেকে সরানো হয়েছে।' : 'পণ্যটি আপনার পছন্দের তালিকায় সংরক্ষিত হয়েছে।'
+      );
+    },
+    onError: (error) => {
+      Alert.alert(
+        'উইশলিস্ট আপডেট হয়নি',
+        error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
+      );
+    },
   });
 
   const openVideo = async () => {
@@ -132,16 +165,32 @@ export function DropshippingProductDetailsScreen() {
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </Pressable>
         <Text className="flex-1 text-[15px] font-extrabold text-ink">পণ্যের বিস্তারিত</Text>
-        {product.videoUrl ? (
+        <View className="flex-row">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="পণ্যের ভিডিও খুলুন"
-            onPress={() => void openVideo()}
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary-light"
+            accessibilityLabel={isWishlisted ? 'উইশলিস্ট থেকে সরান' : 'উইশলিস্টে যোগ করুন'}
+            accessibilityState={{ selected: isWishlisted, disabled: wishlistMutation.isPending }}
+            disabled={wishlistMutation.isPending || wishlistQuery.isPending}
+            onPress={() => wishlistMutation.mutate()}
+            className="mr-2 h-10 w-10 items-center justify-center rounded-full bg-red-50"
           >
-            <Ionicons name="videocam" size={20} color={colors.primary} />
+            {wishlistMutation.isPending ? (
+              <ActivityIndicator size="small" color="#DC2626" />
+            ) : (
+              <Ionicons name={isWishlisted ? 'heart' : 'heart-outline'} size={20} color="#DC2626" />
+            )}
           </Pressable>
-        ) : null}
+          {product.videoUrl ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="পণ্যের ভিডিও খুলুন"
+              onPress={() => void openVideo()}
+              className="h-10 w-10 items-center justify-center rounded-full bg-primary-light"
+            >
+              <Ionicons name="videocam" size={20} color={colors.primary} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <ScrollView

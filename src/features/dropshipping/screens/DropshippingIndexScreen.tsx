@@ -175,18 +175,18 @@ export function DropshippingIndexScreen() {
         router.replace('/(dropshipping)');
         break;
       case 'profile':
-        router.push('/(ecommerce)/(tabs)/profile');
+        router.push('/(dropshipping)/profile');
         break;
       case 'wishlist':
         router.push({
-          pathname: '/(ecommerce)/(tabs)/profile',
-          params: { tab: 'wishlist' },
+          pathname: '/(dropshipping)/[section]',
+          params: { section: 'wishlist' },
         });
         break;
       case 'orders':
         router.push({
-          pathname: '/(ecommerce)/(tabs)/profile',
-          params: { tab: 'orders' },
+          pathname: '/(dropshipping)/[section]',
+          params: { section: 'order-list' },
         });
         break;
       case 'search':
@@ -276,7 +276,7 @@ export function DropshippingIndexScreen() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="প্রোফাইল"
-          onPress={() => router.push('/(ecommerce)/(tabs)/profile')}
+          onPress={() => router.push('/(dropshipping)/profile')}
           className="h-8 w-8 items-center justify-center"
         >
           <Ionicons name="person-circle-outline" size={22} color={colors.primary} />
@@ -285,8 +285,8 @@ export function DropshippingIndexScreen() {
           accessibilityRole="button"
           accessibilityLabel="উইশলিস্ট"
           onPress={() => router.push({
-            pathname: '/(ecommerce)/(tabs)/profile',
-            params: { tab: 'wishlist' },
+            pathname: '/(dropshipping)/[section]',
+            params: { section: 'wishlist' },
           })}
           className="h-8 w-8 items-center justify-center"
         >

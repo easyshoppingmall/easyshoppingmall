@@ -289,8 +289,8 @@ export const authApi = {
   },
 
   /** Get the authenticated user's profile and backend-provided referral history. */
-  getProfileDashboard: async (): Promise<ProfileDashboard> => {
-    const { data } = await apiClient.get(`${BASE}/userprofile`);
+  getProfileDashboard: async (signal?: AbortSignal): Promise<ProfileDashboard> => {
+    const { data } = await apiClient.get(`${BASE}/userprofile`, { signal });
     const response = asRecord(data) ?? {};
     const body = asRecord(response.data) ?? response;
     const profile = normalizeUser(body.user ?? asRecord(body.data)?.user);

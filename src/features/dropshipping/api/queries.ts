@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAppSelector } from '../../../store/hooks';
+import { authApi } from '../../../api/authApi';
 import {
   getActiveDropshippingNotices,
   getDropshippingBanners,
@@ -12,6 +13,7 @@ import {
   searchDropshippingProducts,
   type DropshippingProductType,
 } from './homeApi';
+import { getDropshippingWishlist } from './wishlistApi';
 
 export const dropshippingHomeQueryKeys = {
   profile: (userId: string) => ['dropshipping', 'profile', userId] as const,
@@ -27,6 +29,9 @@ export const dropshippingHomeQueryKeys = {
     ['dropshipping', 'catalog', 'products', categoryId, subcategoryId, page] as const,
   productDetails: (productId: string) =>
     ['dropshipping', 'product-details', productId] as const,
+  profileDashboard: (userId: string) =>
+    ['dropshipping', 'profile-dashboard', userId] as const,
+  wishlist: (userId: string) => ['dropshipping', 'wishlist', userId] as const,
 };
 
 export function useDropshippingProfileQuery() {
@@ -34,6 +39,16 @@ export function useDropshippingProfileQuery() {
   return useQuery({
     queryKey: dropshippingHomeQueryKeys.profile(userId ?? ''),
     queryFn: ({ signal }) => getDropshippingProfile(signal),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+}
+
+export function useDropshippingProfileDashboardQuery() {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.profileDashboard(userId ?? ''),
+    queryFn: ({ signal }) => authApi.getProfileDashboard(signal),
     enabled: Boolean(userId),
     staleTime: 60_000,
   });
@@ -116,5 +131,15 @@ export function useDropshippingProductDetailsQuery(productId: string) {
     queryFn: ({ signal }) => getDropshippingProductDetails(productId, signal),
     enabled: Boolean(productId),
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useDropshippingWishlistQuery() {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.wishlist(userId ?? ''),
+    queryFn: getDropshippingWishlist,
+    enabled: Boolean(userId),
+    staleTime: 60_000,
   });
 }

@@ -8,6 +8,8 @@ import { useDropshippingProfileQuery } from '../api/queries';
 import { formatDropshippingTaka } from '../api/homeApi';
 import { DropshippingSearchScreen } from './DropshippingSearchScreen';
 import { DropshippingAllProductsScreen } from './DropshippingAllProductsScreen';
+import { DropshippingProfileScreen } from './DropshippingProfileScreen';
+import { DropshippingWishlistScreen } from './DropshippingWishlistScreen';
 
 const SECTIONS: Record<
   string,
@@ -63,6 +65,11 @@ const SECTIONS: Record<
     description: 'আপনার অর্ডারের তালিকা',
     icon: 'receipt-outline',
   },
+  wishlist: {
+    title: 'Wishlist',
+    description: 'আপনার পছন্দের পণ্য সংরক্ষণের তালিকা',
+    icon: 'heart-outline',
+  },
   blog: {
     title: 'Blog',
     description: 'ড্রপশিপিং বিষয়ক লেখা ও আপডেট',
@@ -109,6 +116,10 @@ export function DropshippingSectionScreen() {
   const profile = profileQuery.data;
 
   if (section === 'search-products') return <DropshippingSearchScreen />;
+  if (section === 'account' || section === 'referral-profile') {
+    return <DropshippingProfileScreen />;
+  }
+  if (section === 'wishlist') return <DropshippingWishlistScreen />;
   if (section === 'all-products' || section === 'new-products') {
     return <DropshippingAllProductsScreen />;
   }

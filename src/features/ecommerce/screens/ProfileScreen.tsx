@@ -282,7 +282,7 @@ export const ProfileScreen: React.FC = () => {
 
   const profileQuery = useQuery<ProfileDashboard>({
     queryKey: ['auth', 'profile-dashboard', userId],
-    queryFn: authApi.getProfileDashboard,
+    queryFn: ({ signal }) => authApi.getProfileDashboard(signal),
     enabled: Boolean(userId),
   });
   const profile = profileQuery.data?.user ?? sessionUser;

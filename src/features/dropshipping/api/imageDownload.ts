@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { Asset, requestPermissionsAsync } from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { Platform } from 'react-native';
 
 function getImageExtension(imageUrl: string): string {
@@ -40,9 +40,9 @@ export async function downloadDropshippingImage(
   if (!downloadedFile.exists) {
     throw new Error('ছবিটি ডিভাইসে ডাউনলোড করা যায়নি।');
   }
-  const permission = await requestPermissionsAsync(true, ['photo']);
+  const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
   if (permission.status !== 'granted') {
     throw new Error('গ্যালারিতে ছবি সংরক্ষণ করতে Photos অনুমতি দিন।');
   }
-  await Asset.create(downloadedFile.uri);
+  await MediaLibrary.createAssetAsync(downloadedFile.uri);
 }

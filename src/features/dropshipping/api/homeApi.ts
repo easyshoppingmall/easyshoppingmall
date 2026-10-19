@@ -76,11 +76,30 @@ export interface DropshippingProfile {
   _id: string;
   name?: string;
   email?: string;
+  phone?: string;
   mobile?: string | number | null;
   image?: string | null;
+  shopLogo?: string | null;
   role?: string;
+  status?: string;
+  isVerified?: boolean;
   balance?: number | null;
+  referralCode?: string;
+  referralCount?: number;
+  date_of_birth?: string | null;
+  gender?: 'Male' | 'Female' | 'Other' | null;
   shopName?: string | null;
+  shopAddress?: string | null;
+  shopWebsite?: string | null;
+  facebookPage?: string | null;
+  whatsappNumber?: string | null;
+  paymentDetails?: {
+    bkash?: string | null;
+    nagad?: string | null;
+    rocket?: string | null;
+    bank?: string | null;
+  } | null;
+  createdAt?: string;
 }
 
 export interface DropshippingBanner {
