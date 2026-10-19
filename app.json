@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "EasyShoppingMallBD",
+    "slug": "easyshoppingmallbd",
+    "scheme": "easyshoppingmallbd",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow EasyShoppingMallBD to select product and profile photos.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow EasyShoppingMallBD to access photos.",
+          "savePhotosPermission": "Allow EasyShoppingMallBD to save product images.",
+          "granularPermissions": ["photo"]
+        }
+      ]
+    ]
+  }
+}

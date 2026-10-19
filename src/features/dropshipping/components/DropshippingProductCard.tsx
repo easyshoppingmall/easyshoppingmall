@@ -1,0 +1,71 @@
+import React from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  formatDropshippingTaka,
+  type DropshippingProduct,
+} from '../api/homeApi';
+
+interface DropshippingProductCardProps {
+  product: DropshippingProduct;
+  onPress: () => void;
+}
+
+export function DropshippingProductCard({
+  product,
+  onPress,
+}: DropshippingProductCardProps) {
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      onPress={onPress}
+      activeOpacity={0.88}
+      className="mr-3 w-[154px] overflow-hidden rounded-2xl border border-line bg-white"
+      style={{
+        shadowColor: '#12263A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+      }}
+    >
+      <View className="h-[112px] items-center justify-center overflow-hidden bg-primary-light">
+        {product.image ? (
+          <Image
+            source={{ uri: product.image }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={product.id}
+            style={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <Ionicons name="cube-outline" size={34} color="#0092EE" />
+        )}
+        {product.discount ? (
+          <View className="absolute left-2 top-2 rounded-md bg-red-500 px-1.5 py-1">
+            <Text className="text-[9px] font-bold text-white">
+              {product.discount}% ছাড়
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View className="p-2.5">
+        <Text numberOfLines={2} className="h-9 text-[12px] font-semibold leading-[17px] text-ink">
+          {product.name}
+        </Text>
+        {product.brand ? (
+          <Text numberOfLines={1} className="mt-0.5 text-[10px] text-muted">
+            {product.brand}
+          </Text>
+        ) : null}
+        <Text className="mt-1 text-[13px] font-bold text-primary-dark">
+          {formatDropshippingTaka(product.dropshippingPrice ?? product.price)}
+        </Text>
+        {product.dropshippingPrice !== undefined ? (
+          <Text className="mt-0.5 text-[9px] text-muted">ড্রপশিপিং মূল্য</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
