@@ -32,6 +32,7 @@ interface ApiProduct {
   brand?: string;
   price?: number | string | null;
   dropshippingPrice?: number | string | null;
+  productRank?: number | string | null;
   discount?: number | null;
   images?: string[];
   isBoost?: boolean;
@@ -124,6 +125,7 @@ export interface DropshippingProduct {
   brand?: string;
   price: number;
   dropshippingPrice?: number;
+  productRank?: number;
   discount?: number;
   image?: string;
   images?: string[];
@@ -211,6 +213,7 @@ function mapDropshippingProduct(product: ApiProduct): DropshippingProduct {
     brand: product.brand?.trim() || undefined,
     price: toOptionalNumber(product.price) ?? 0,
     dropshippingPrice: toOptionalNumber(product.dropshippingPrice),
+    productRank: toOptionalNumber(product.productRank),
     discount: toOptionalNumber(product.discount),
     image: images[0],
     images,
@@ -368,7 +371,7 @@ export async function searchDropshippingProducts(
     throw new Error('পণ্য খুঁজতে কমপক্ষে ২টি অক্ষর লিখুন।');
   }
 
-  const limit = 12;
+  const limit = 40;
   const { data } = await apiClient.post<ApiProductPage>(
     '/api/products/search-product',
     { search: normalizedSearch, page, limit },

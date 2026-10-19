@@ -1,29 +1,39 @@
-import { useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
   Text,
   View,
+  type ViewToken,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
+import { useAppSelector } from '../../../store/hooks';
 import { DropshippingCatalogProductCard } from '../components/DropshippingCatalogProductCard';
 import {
   dropshippingHomeQueryKeys,
   useDropshippingSubcategoriesQuery,
   useDropshippingSubcategoryProductsQuery,
+  useDropshippingWishlistQuery,
 } from '../api/queries';
+import {
+  addDropshippingWishlistProduct,
+  removeDropshippingWishlistProduct,
+} from '../api/wishlistApi';
 import {
   formatDropshippingNumber,
   type DropshippingProduct,
   type DropshippingProductPage,
 } from '../api/homeApi';
+
+const PRODUCT_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 20 };
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -56,13 +66,27 @@ export function DropshippingSubcategoryProductsScreen() {
   const routeCategoryId = firstParam(params.categoryId);
   const routeName = firstParam(params.name);
   const queryClient = useQueryClient();
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const subcategoriesQuery = useDropshippingSubcategoriesQuery();
+  const wishlistQuery = useDropshippingWishlistQuery();
   const subcategory = subcategoriesQuery.data?.find((item) => item.id === subcategoryId);
   const categoryId = routeCategoryId || subcategory?.categoryId || '';
   const title = routeName || subcategory?.name || 'সাবক্যাটাগরির পণ্য';
   const [pagination, setPagination] = useState({ subcategoryId: '', page: 1 });
+  const [visibleProductIds, setVisibleProductIds] = useState<Set<string>>(() => new Set());
   const page = pagination.subcategoryId === subcategoryId ? pagination.page : 1;
   const listRef = useRef<FlatList<DropshippingProduct>>(null);
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<DropshippingProduct>[] }) => {
+      const visibleIds = new Set(viewableItems.map(({ item }) => item.id));
+      setVisibleProductIds((current) =>
+        current.size === visibleIds.size && [...current].every((id) => visibleIds.has(id))
+          ? current
+          : visibleIds
+      );
+    },
+    []
+  );
   const productsQuery = useDropshippingSubcategoryProductsQuery(categoryId, subcategoryId, page);
   const { width: screenWidth } = useWindowDimensions();
   const contentWidth = Math.min(Math.max(screenWidth - 32, 0), 1120);
@@ -70,6 +94,23 @@ export function DropshippingSubcategoryProductsScreen() {
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
   const products = productsQuery.data?.products ?? [];
+  const wishlistMutation = useMutation({
+    mutationFn: ({ productId, add }: { productId: string; add: boolean }) =>
+      add
+        ? addDropshippingWishlistProduct(productId)
+        : removeDropshippingWishlistProduct(productId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: dropshippingHomeQueryKeys.wishlist(userId ?? ''),
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'উইশলিস্ট আপডেট হয়নি',
+        error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
+      );
+    },
+  });
   const previousPageData = page > 1
     ? queryClient.getQueryData<DropshippingProductPage>(
         dropshippingHomeQueryKeys.subcategoryProducts(categoryId, subcategoryId, page - 1)
@@ -119,11 +160,15 @@ export function DropshippingSubcategoryProductsScreen() {
           <FlatList
             ref={listRef}
             key={`product-grid-${columns}`}
+            style={{ flex: 1 }}
             data={productsQuery.isPending || productsQuery.isError ? [] : products}
             numColumns={columns}
             initialNumToRender={columns * 2}
             maxToRenderPerBatch={columns * 2}
             windowSize={5}
+            extraData={visibleProductIds}
+            viewabilityConfig={PRODUCT_VIEWABILITY_CONFIG}
+            onViewableItemsChanged={onViewableItemsChanged}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
@@ -158,6 +203,21 @@ export function DropshippingSubcategoryProductsScreen() {
               <View style={{ width: cardWidth, marginBottom: gap }}>
                 <DropshippingCatalogProductCard
                   product={item}
+                  isWishlisted={wishlistQuery.data?.some((saved) => saved.id === item.id) ?? false}
+                  onToggleWishlist={() =>
+                    wishlistMutation.mutate({
+                      productId: item.id,
+                      add: !(wishlistQuery.data?.some((saved) => saved.id === item.id) ?? false),
+                    })
+                  }
+                  wishlistDisabled={
+                    wishlistQuery.isPending ||
+                    (wishlistMutation.isPending && wishlistMutation.variables?.productId === item.id)
+                  }
+                  wishlistPending={
+                    wishlistMutation.isPending && wishlistMutation.variables?.productId === item.id
+                  }
+                  isVisible={visibleProductIds.has(item.id)}
                   onPress={() =>
                     router.push({
                       pathname: '/(dropshipping)/product/[id]',

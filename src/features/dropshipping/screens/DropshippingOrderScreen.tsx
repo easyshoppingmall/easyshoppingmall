@@ -26,9 +26,11 @@ import {
   formatDropshippingTaka,
 } from '../api/homeApi';
 import {
+  applyDropshippingCoupon,
   createDropshippingOrder,
   submitDropshippingManualPayment,
   type CreateDropshippingOrderPayload,
+  type DropshippingCouponResult,
   type DropshippingOrderResult,
   type DropshippingPaymentProvider,
   type DropshippingPaymentType,
@@ -150,6 +152,14 @@ export function DropshippingOrderScreen() {
   const [paymentType, setPaymentType] = useState<DropshippingPaymentType>('delivery');
   const [paymentNumber, setPaymentNumber] = useState('');
   const [transactionId, setTransactionId] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    productId: string;
+    quantity: number;
+    price: number;
+    result: DropshippingCouponResult;
+  }>();
   const [orderResult, setOrderResult] = useState<DropshippingOrderResult>();
   const [paymentRetryError, setPaymentRetryError] = useState('');
 
@@ -179,7 +189,20 @@ export function DropshippingOrderScreen() {
   const estimateDeliveryCharge = ['ঢাকা', 'dhaka'].includes(district.trim().toLocaleLowerCase())
     ? 80
     : 130;
-  const totalEstimate = subtotal + estimateDeliveryCharge;
+  const activeCoupon =
+    appliedCoupon &&
+    appliedCoupon.code.toLocaleLowerCase() === couponCode.trim().toLocaleLowerCase() &&
+    appliedCoupon.productId === product?.id &&
+    appliedCoupon.quantity === parsedQuantity &&
+    appliedCoupon.price === unitPrice
+      ? appliedCoupon
+      : undefined;
+  const couponDiscount = activeCoupon?.result.discountAmount ?? 0;
+  const totalEstimate = Math.max(0, subtotal + estimateDeliveryCharge - couponDiscount);
+  const estimatedProfit =
+    product?.productRank !== undefined && unitPrice !== undefined && quantityIsValid
+      ? (product.productRank - unitPrice) * parsedQuantity
+      : undefined;
   const locationOptions = useMemo(() => {
     if (locationPicker === 'division') {
       return bangladeshLocations.map((location) => location.division);
@@ -215,6 +238,21 @@ export function DropshippingOrderScreen() {
         'অর্ডার করা যায়নি',
         error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
       );
+    },
+  });
+
+  const couponMutation = useMutation({
+    mutationFn: ({ code, productId, quantity, price }: {
+      code: string;
+      productId: string;
+      quantity: number;
+      price: number;
+    }) => applyDropshippingCoupon(code, productId, quantity, price),
+    onSuccess: (result, variables) => {
+      setAppliedCoupon({
+        ...variables,
+        result,
+      });
     },
   });
 
@@ -318,7 +356,8 @@ export function DropshippingOrderScreen() {
           transactionId: transactionId.trim(),
         },
       },
-      couponDiscount: 0,
+      ...(activeCoupon ? { appliedCoupon: activeCoupon.result.coupon } : {}),
+      couponDiscount,
     };
     orderMutation.mutate(payload);
   };
@@ -395,6 +434,24 @@ export function DropshippingOrderScreen() {
                 সার্ভার-নিশ্চিত মোট: {formatDropshippingTaka(orderResult.orderTotal)}
               </Text>
             ) : null}
+            <View className="mt-5 rounded-2xl bg-bg p-4">
+              <Text className="mb-2 text-[12px] font-extrabold text-ink">গ্রাহকের অর্ডার</Text>
+              <Text className="text-[11px] text-muted">পণ্য: {product.name} × {formatDropshippingNumber(parsedQuantity)}</Text>
+              <Text className="mt-1 text-[11px] text-muted">গ্রাহক: {customerName} · {phone}</Text>
+              <Text className="mt-1 text-[11px] text-muted">
+                ঠিকানা: {address}, {upazila}, {district}, {division}
+              </Text>
+              {activeCoupon ? (
+                <Text className="mt-1 text-[11px] text-emerald-700">
+                  কুপন: {activeCoupon.code} · ছাড় {formatDropshippingTaka(couponDiscount)}
+                </Text>
+              ) : null}
+              {estimatedProfit !== undefined ? (
+                <Text className="mt-1 text-[11px] font-semibold text-emerald-700">
+                  আনুমানিক পণ্য-মার্জিন: {formatDropshippingTaka(estimatedProfit)} (কুপন/চার্জের আগে)
+                </Text>
+              ) : null}
+            </View>
             {orderResult.paymentWarning || paymentRetryError ? (
               <View className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <Text className="text-[12px] font-semibold text-amber-900">
@@ -445,6 +502,17 @@ export function DropshippingOrderScreen() {
                       ? 'মূল্য পাওয়া যায়নি'
                       : formatDropshippingTaka(product.dropshippingPrice)}
                   </Text>
+                  <Text className="mt-2 text-[10px] text-muted">প্রস্তাবিত বিক্রয়মূল্য (Product Rank)</Text>
+                  <Text className="text-[13px] font-bold text-ink">
+                    {product.productRank === undefined
+                      ? 'তথ্য পাওয়া যায়নি'
+                      : formatDropshippingTaka(product.productRank)}
+                  </Text>
+                  {product.productRank !== undefined && product.dropshippingPrice !== undefined ? (
+                    <Text className={`mt-1 text-[10px] font-bold ${product.productRank >= product.dropshippingPrice ? 'text-emerald-700' : 'text-red-600'}`}>
+                      আনুমানিক লাভ: {formatDropshippingTaka(product.productRank - product.dropshippingPrice)} / পিস
+                    </Text>
+                  ) : null}
                   {product.stockCount !== undefined ? (
                     <Text className={`mt-1 text-[10px] ${product.stockCount > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                       {product.stockCount > 0 ? `স্টকে ${formatDropshippingNumber(product.stockCount)}টি` : 'স্টক নেই'}
@@ -458,7 +526,16 @@ export function DropshippingOrderScreen() {
                 <ChoiceRow label="সাইজ" options={product.sizes ?? []} value={selectedSize} onSelect={(value) => changeVariant('size', value)} />
                 <ChoiceRow label="রং" options={product.colors ?? []} value={selectedColor} onSelect={(value) => changeVariant('color', value)} />
                 <ChoiceRow label="ওজন" options={product.weights ?? []} value={selectedWeight} onSelect={(value) => changeVariant('weight', value)} />
-                <FormField label="পরিমাণ" value={quantity} onChangeText={setQuantity} placeholder="১" keyboardType="number-pad" />
+                <FormField
+                  label="পরিমাণ"
+                  value={quantity}
+                  onChangeText={(value) => {
+                    setQuantity(value);
+                    couponMutation.reset();
+                  }}
+                  placeholder="১"
+                  keyboardType="number-pad"
+                />
               </View>
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
@@ -491,6 +568,72 @@ export function DropshippingOrderScreen() {
                   </View>
                 ))}
                 <FormField label="পোস্ট কোড (ঐচ্ছিক)" value={postCode} onChangeText={setPostCode} placeholder="পোস্ট কোড" keyboardType="number-pad" />
+              </View>
+
+              <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
+                <Text className="mb-2 text-[14px] font-extrabold text-ink">কুপন কোড</Text>
+                <View className="flex-row items-center">
+                  <TextInput
+                    value={couponCode}
+                    onChangeText={(value) => {
+                      setCouponCode(value);
+                      couponMutation.reset();
+                    }}
+                    placeholder="কুপন কোড লিখুন"
+                    autoCapitalize="characters"
+                    placeholderTextColor={colors.muted}
+                    className="mr-2 min-h-11 flex-1 rounded-xl border border-line bg-bg px-3 text-[12px] text-ink"
+                  />
+                  {activeCoupon ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        setCouponCode('');
+                        setAppliedCoupon(undefined);
+                        couponMutation.reset();
+                      }}
+                      className="min-h-11 items-center justify-center rounded-xl border border-line px-4"
+                    >
+                      <Text className="text-[11px] font-bold text-ink">সরান</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={
+                        couponMutation.isPending ||
+                        !couponCode.trim() ||
+                        !product.dropshippingPrice ||
+                        !quantityIsValid
+                      }
+                      onPress={() => {
+                        if (!product.dropshippingPrice) return;
+                        couponMutation.mutate({
+                          code: couponCode.trim(),
+                          productId: product.id,
+                          quantity: parsedQuantity,
+                          price: product.dropshippingPrice,
+                        });
+                      }}
+                      className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${couponMutation.isPending || !couponCode.trim() ? 'bg-primary/50' : 'bg-primary'}`}
+                    >
+                      {couponMutation.isPending ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text className="text-[11px] font-bold text-white">প্রয়োগ</Text>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+                {couponMutation.isError ? (
+                  <Text className="mt-2 text-[10px] text-red-600">
+                    {couponMutation.error.message || 'কুপনটি প্রয়োগ করা যায়নি।'}
+                  </Text>
+                ) : null}
+                {activeCoupon ? (
+                  <Text className="mt-2 text-[10px] font-semibold text-emerald-700">
+                    কুপন প্রয়োগ হয়েছে · ছাড় {formatDropshippingTaka(couponDiscount)}
+                  </Text>
+                ) : null}
               </View>
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
@@ -535,10 +678,24 @@ export function DropshippingOrderScreen() {
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
                 <Text className="mb-3 text-[14px] font-extrabold text-ink">অর্ডারের হিসাব</Text>
+                {estimatedProfit !== undefined ? (
+                  <View className="mb-2 flex-row justify-between">
+                    <Text className="text-[12px] text-muted">আনুমানিক লাভ (কুপন/চার্জের আগে)</Text>
+                    <Text className={`text-[12px] font-bold ${estimatedProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                      {formatDropshippingTaka(estimatedProfit)}
+                    </Text>
+                  </View>
+                ) : null}
                 <View className="mb-2 flex-row justify-between">
                   <Text className="text-[12px] text-muted">পণ্য × পরিমাণ</Text>
                   <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(subtotal)}</Text>
                 </View>
+                {activeCoupon ? (
+                  <View className="mb-2 flex-row justify-between">
+                    <Text className="text-[12px] text-muted">কুপন ছাড়</Text>
+                    <Text className="text-[12px] font-semibold text-emerald-700">−{formatDropshippingTaka(couponDiscount)}</Text>
+                  </View>
+                ) : null}
                 <View className="mb-2 flex-row justify-between">
                   <Text className="text-[12px] text-muted">আনুমানিক ডেলিভারি</Text>
                   <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(estimateDeliveryCharge)}</Text>

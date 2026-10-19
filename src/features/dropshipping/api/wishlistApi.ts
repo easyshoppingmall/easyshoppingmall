@@ -55,6 +55,12 @@ function mapWishlistProduct(value: unknown): DropshippingWishlistProduct | undef
       dropshippingPrice !== undefined && Number.isFinite(dropshippingPrice)
         ? dropshippingPrice
         : undefined,
+    productRank:
+      product.productRank === null || product.productRank === undefined || product.productRank === ''
+        ? undefined
+        : Number.isFinite(Number(product.productRank))
+          ? Number(product.productRank)
+          : undefined,
     image: images[0],
     images,
   };

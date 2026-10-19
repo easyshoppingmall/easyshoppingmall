@@ -59,11 +59,22 @@ export function DropshippingProductCard({
             {product.brand}
           </Text>
         ) : null}
-        <Text className="mt-1 text-[13px] font-bold text-primary-dark">
-          {formatDropshippingTaka(product.dropshippingPrice ?? product.price)}
+        <Text className="mt-1 text-[9px] text-muted">আপনার পণ্য খরচ</Text>
+        <Text className="mt-0.5 text-[13px] font-bold text-primary-dark">
+          {product.dropshippingPrice === undefined
+            ? 'মূল্য পাওয়া যায়নি'
+            : formatDropshippingTaka(product.dropshippingPrice)}
         </Text>
-        {product.dropshippingPrice !== undefined ? (
-          <Text className="mt-0.5 text-[9px] text-muted">ড্রপশিপিং মূল্য</Text>
+        <Text className="mt-1 text-[9px] text-muted">Product Rank / বিক্রয়মূল্য</Text>
+        <Text className="text-[11px] font-semibold text-ink">
+          {product.productRank === undefined
+            ? 'তথ্য পাওয়া যায়নি'
+            : formatDropshippingTaka(product.productRank)}
+        </Text>
+        {product.productRank !== undefined && product.dropshippingPrice !== undefined ? (
+          <Text className={`mt-0.5 text-[9px] font-semibold ${product.productRank >= product.dropshippingPrice ? 'text-emerald-700' : 'text-red-600'}`}>
+            আনুমানিক লাভ {formatDropshippingTaka(product.productRank - product.dropshippingPrice)} / পিস
+          </Text>
         ) : null}
       </View>
     </TouchableOpacity>

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   Keyboard,
@@ -8,80 +10,30 @@ import {
   Text,
   TextInput,
   View,
+  type ViewToken,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
+import { useAppSelector } from '../../../store/hooks';
+import { DropshippingCatalogProductCard } from '../components/DropshippingCatalogProductCard';
 import {
-  formatDropshippingTaka,
   formatDropshippingNumber,
   type DropshippingProduct,
 } from '../api/homeApi';
-import { useSearchDropshippingProductsQuery } from '../api/queries';
+import {
+  dropshippingHomeQueryKeys,
+  useDropshippingWishlistQuery,
+  useSearchDropshippingProductsQuery,
+} from '../api/queries';
+import {
+  addDropshippingWishlistProduct,
+  removeDropshippingWishlistProduct,
+} from '../api/wishlistApi';
 
 const MIN_SEARCH_LENGTH = 2;
-
-function ProductResultCard({ product }: { product: DropshippingProduct }) {
-  return (
-    <View className="mb-3 flex-1 overflow-hidden rounded-2xl border border-line bg-white">
-      <View className="h-[142px] items-center justify-center overflow-hidden bg-primary-light">
-        {product.image ? (
-          <Image
-            source={{ uri: product.image }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={product.id}
-            style={{ width: '100%', height: '100%' }}
-          />
-        ) : (
-          <Ionicons name="cube-outline" size={36} color={colors.primary} />
-        )}
-        {product.discount && product.discount > 0 ? (
-          <View className="absolute left-2 top-2 rounded-full bg-red-500 px-2 py-1">
-            <Text className="text-[9px] font-bold text-white">
-              {formatDropshippingNumber(product.discount)}% ছাড়
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View className="p-3">
-        {product.brand ? (
-          <Text numberOfLines={1} className="text-[10px] font-medium text-muted">
-            {product.brand}
-          </Text>
-        ) : null}
-        <Text
-          numberOfLines={2}
-          className={`text-[12px] font-bold leading-[18px] text-ink ${product.brand ? 'mt-1' : ''}`}
-        >
-          {product.name}
-        </Text>
-
-        <View className="mt-3 border-t border-line pt-2.5">
-          <View className="flex-row items-start justify-between">
-            <View className="flex-1 pr-1">
-              <Text className="text-[9px] text-muted">ড্রপশিপিং মূল্য</Text>
-              <Text numberOfLines={1} className="mt-0.5 text-[12px] font-extrabold text-primary-dark">
-                {formatDropshippingTaka(product.dropshippingPrice ?? product.price)}
-              </Text>
-            </View>
-            {product.dropshippingPrice !== undefined ? (
-              <View className="flex-1 items-end pl-1">
-                <Text className="text-[9px] text-muted">পণ্যের মূল্য</Text>
-                <Text numberOfLines={1} className="mt-0.5 text-[11px] font-semibold text-ink">
-                  {formatDropshippingTaka(product.price)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
+const PRODUCT_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 20 };
 
 function EmptySearchState({
   hasSearch,
@@ -128,12 +80,44 @@ function EmptySearchState({
 
 export function DropshippingSearchScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  const wishlistQuery = useDropshippingWishlistQuery();
   const [searchText, setSearchText] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [visibleProductIds, setVisibleProductIds] = useState<Set<string>>(() => new Set());
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<DropshippingProduct>[] }) => {
+      const visibleIds = new Set(viewableItems.map(({ item }) => item.id));
+      setVisibleProductIds((current) =>
+        current.size === visibleIds.size && [...current].every((id) => visibleIds.has(id))
+          ? current
+          : visibleIds
+      );
+    },
+    []
+  );
   const normalizedText = searchText.trim();
   const isDebouncing = normalizedText !== activeSearch;
   const query = useSearchDropshippingProductsQuery(activeSearch, page);
+  const wishlistMutation = useMutation({
+    mutationFn: ({ productId, add }: { productId: string; add: boolean }) =>
+      add
+        ? addDropshippingWishlistProduct(productId)
+        : removeDropshippingWishlistProduct(productId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: dropshippingHomeQueryKeys.wishlist(userId ?? ''),
+      });
+    },
+    onError: (error) => {
+      Alert.alert(
+        'উইশলিস্ট আপডেট হয়নি',
+        error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
+      );
+    },
+  });
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -238,9 +222,13 @@ export function DropshippingSearchScreen() {
       </View>
 
       <FlatList
+        style={{ flex: 1 }}
         data={showEmptyState || query.isError ? [] : products}
         keyExtractor={(item) => item.id}
         numColumns={2}
+        extraData={visibleProductIds}
+        viewabilityConfig={PRODUCT_VIEWABILITY_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerClassName="px-4 pb-8"
@@ -261,13 +249,37 @@ export function DropshippingSearchScreen() {
               </Text>
               {query.data.totalPages > 1 ? (
                 <Text className="text-[10px] text-muted">
-                  পৃষ্ঠা {formatDropshippingNumber(query.data.page)} / {formatDropshippingNumber(query.data.totalPages)}
+                  পৃষ্ঠা {formatDropshippingNumber(query.data.page)} / {formatDropshippingNumber(query.data.totalPages)} · প্রতি পাতায় ৪০টি
                 </Text>
               ) : null}
             </View>
           ) : null
         }
-        renderItem={({ item }) => <ProductResultCard product={item} />}
+        renderItem={({ item }) => {
+          const isWishlisted = wishlistQuery.data?.some((saved) => saved.id === item.id) ?? false;
+          const isWishlistPending =
+            wishlistMutation.isPending && wishlistMutation.variables?.productId === item.id;
+          return (
+            <View style={{ flex: 1, marginBottom: 12 }}>
+              <DropshippingCatalogProductCard
+                product={item}
+                isWishlisted={isWishlisted}
+                onToggleWishlist={() =>
+                  wishlistMutation.mutate({ productId: item.id, add: !isWishlisted })
+                }
+                wishlistDisabled={wishlistQuery.isPending || isWishlistPending}
+                wishlistPending={isWishlistPending}
+                isVisible={visibleProductIds.has(item.id)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(dropshipping)/product/[id]',
+                    params: { id: item.id },
+                  })
+                }
+              />
+            </View>
+          );
+        }}
         ListEmptyComponent={
           query.isPending && hasSearch && !isDebouncing ? (
             <View className="items-center py-12">

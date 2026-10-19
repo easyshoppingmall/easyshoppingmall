@@ -256,12 +256,25 @@ export function DropshippingProductDetailsScreen() {
             <Text className="mt-1 text-[19px] font-extrabold leading-7 text-ink">{product.name}</Text>
 
             <View className="mt-4 rounded-2xl bg-primary-light px-4 py-3">
-              <Text className="text-[10px] font-medium text-muted">ড্রপশিপিং মূল্য</Text>
+              <Text className="text-[10px] font-medium text-muted">আপনার পণ্য খরচ</Text>
               <Text className="mt-1 text-[22px] font-extrabold text-primary-dark">
                 {product.dropshippingPrice === undefined
                   ? 'মূল্য পাওয়া যায়নি'
                   : formatDropshippingTaka(product.dropshippingPrice)}
               </Text>
+              <Text className="mt-3 text-[10px] font-medium text-muted">
+                প্রস্তাবিত বিক্রয়মূল্য (Product Rank)
+              </Text>
+              <Text className="mt-1 text-[18px] font-extrabold text-ink">
+                {product.productRank === undefined
+                  ? 'তথ্য পাওয়া যায়নি'
+                  : formatDropshippingTaka(product.productRank)}
+              </Text>
+              {product.productRank !== undefined && product.dropshippingPrice !== undefined ? (
+                <Text className={`mt-1 text-[11px] font-bold ${product.productRank >= product.dropshippingPrice ? 'text-emerald-700' : 'text-red-600'}`}>
+                  আনুমানিক লাভ: {formatDropshippingTaka(product.productRank - product.dropshippingPrice)} / পিস
+                </Text>
+              ) : null}
             </View>
 
             {product.description ? (

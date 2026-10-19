@@ -39,7 +39,8 @@ export interface CreateDropshippingOrderPayload {
       transactionId: string;
     };
   };
-  couponDiscount: 0;
+  appliedCoupon?: Record<string, unknown>;
+  couponDiscount: number;
 }
 
 export interface DropshippingOrderResult {
@@ -48,10 +49,43 @@ export interface DropshippingOrderResult {
   paymentWarning?: string;
 }
 
+export interface DropshippingCouponResult {
+  discountAmount: number;
+  coupon: Record<string, unknown>;
+}
+
 function record(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
+}
+
+export async function applyDropshippingCoupon(
+  code: string,
+  productId: string,
+  quantity: number,
+  price: number
+): Promise<DropshippingCouponResult> {
+  const { data } = await apiClient.post<{
+    success?: boolean;
+    message?: string;
+    discountAmount?: number | string;
+    coupon?: unknown;
+  }>('/api/coupon/apply-ds', {
+    code,
+    cartItems: [{ productId, quantity, price }],
+  });
+  if (data.success === false) {
+    throw new Error(data.message || 'কুপনটি প্রয়োগ করা যায়নি।');
+  }
+
+  const discountAmount = Number(data.discountAmount);
+  const coupon = record(data.coupon);
+  if (!Number.isFinite(discountAmount) || discountAmount < 0 || !coupon) {
+    throw new Error('সার্ভার থেকে কুপনের সঠিক তথ্য পাওয়া যায়নি।');
+  }
+
+  return { discountAmount, coupon };
 }
 
 function responseError(value: unknown, fallback: string): string {
