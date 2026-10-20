@@ -6,10 +6,12 @@ import {
 } from '@reduxjs/toolkit';
 import { queryClient } from '../config/queryClient';
 import cartReducer, { clearCustomerState } from './cartSlice';
+import dropshippingCartReducer, { clearDropshippingCart } from './dropshippingCartSlice';
 import authReducer, { signIn, signOut } from './authSlice';
 
 const rootReducer = combineReducers({
   cart: cartReducer,
+  dropshippingCart: dropshippingCartReducer,
   auth: authReducer,
 });
 
@@ -20,6 +22,7 @@ authLifecycleMiddleware.startListening({
   matcher: isAnyOf(signOut.fulfilled, signOut.rejected),
   effect: (_action, { dispatch }) => {
     dispatch(clearCustomerState());
+    dispatch(clearDropshippingCart());
     queryClient.clear();
   },
 });
@@ -32,6 +35,7 @@ authLifecycleMiddleware.startListening({
     if (previousUserId === currentUserId) return;
 
     listenerApi.dispatch(clearCustomerState());
+    listenerApi.dispatch(clearDropshippingCart());
     queryClient.clear();
   },
 });

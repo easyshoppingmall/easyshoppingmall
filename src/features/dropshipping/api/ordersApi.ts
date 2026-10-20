@@ -1,17 +1,20 @@
 import { apiClient } from '../../../api/client';
 
-export type DropshippingPaymentProvider = 'bkash' | 'nagad';
+export type DropshippingPaymentProvider = 'bkash' | 'nagad' | 'rocket' | 'upay';
 export type DropshippingPaymentType = 'delivery' | 'full';
+export type DropshippingPaymentMethod = 'manual' | 'cod';
+
+export interface DropshippingCouponCartItem {
+  productId: string;
+  quantity: number;
+  price: number;
+}
 
 export interface CreateDropshippingOrderPayload {
-  userId: string;
   products: {
     productId: string;
-    name: string;
-    image: string[];
-    price: number;
     quantity: number;
-    totalPrice: number;
+    sellingPrice: number;
     size?: string;
     color?: string;
     weight?: string;
@@ -26,25 +29,22 @@ export interface CreateDropshippingOrderPayload {
     country: 'Bangladesh';
     mobile: number;
   };
-  deliveryCharge: number;
-  subTotalAmt: number;
-  totalAmt: number;
-  payment_method: 'manual';
-  payment_type: DropshippingPaymentType;
-  payment_details: {
-    transactionId: string;
-    manual: {
+  payment_method: DropshippingPaymentMethod;
+  payment_type: DropshippingPaymentType | 'cod';
+  payment_details?: {
+    transactionId?: string;
+    manual?: {
       provider: DropshippingPaymentProvider;
       senderNumber: string;
       transactionId: string;
     };
   };
-  appliedCoupon?: Record<string, unknown>;
-  couponDiscount: number;
+  appliedCoupon?: string;
 }
 
 export interface DropshippingOrderResult {
   orderId: string;
+  paymentReference?: string;
   orderTotal?: number;
   paymentWarning?: string;
 }
@@ -62,10 +62,11 @@ function record(value: unknown): Record<string, unknown> | undefined {
 
 export async function applyDropshippingCoupon(
   code: string,
-  productId: string,
-  quantity: number,
-  price: number
+  cartItems: DropshippingCouponCartItem[]
 ): Promise<DropshippingCouponResult> {
+  if (!cartItems.length) {
+    throw new Error('কুপন প্রয়োগের জন্য অন্তত একটি পণ্য যোগ করুন।');
+  }
   const { data } = await apiClient.post<{
     success?: boolean;
     message?: string;
@@ -73,7 +74,7 @@ export async function applyDropshippingCoupon(
     coupon?: unknown;
   }>('/api/coupon/apply-ds', {
     code,
-    cartItems: [{ productId, quantity, price }],
+    cartItems,
   });
   if (data.success === false) {
     throw new Error(data.message || 'কুপনটি প্রয়োগ করা যায়নি।');
@@ -123,26 +124,37 @@ export async function createDropshippingOrder(
   }
 
   const order = record(root.data) ?? record(root.order) ?? root;
-  const id = order._id ?? order.id ?? order.orderId ?? order.orderNumber;
-  if (typeof id !== 'string' || !id.trim()) {
+  const orderId = order._id ?? order.id ?? order.orderId ?? order.orderNumber;
+  const displayOrderId = order.orderId ?? order.orderNumber ?? orderId;
+  if (typeof orderId !== 'string' || !orderId.trim() ||
+      typeof displayOrderId !== 'string' || !displayOrderId.trim()) {
     throw new Error('অর্ডার তৈরি হয়েছে, কিন্তু অর্ডার নম্বর পাওয়া যায়নি। আবার পাঠানোর আগে অর্ডার তালিকা যাচাই করুন।');
   }
   const total = Number(order.totalAmt ?? order.totalAmount ?? order.totalPrice);
 
   let paymentWarning: string | undefined;
-  try {
-    await submitDropshippingManualPayment(
-      id,
-      payload.payment_details.manual.provider,
-      payload.payment_details.manual.senderNumber,
-      payload.payment_details.manual.transactionId
-    );
-  } catch (error) {
-    paymentWarning = responseError(error, 'অর্ডার হয়েছে, কিন্তু পেমেন্ট তথ্য জমা হয়নি।');
+  const manualPayment = payload.payment_details?.manual;
+  if (
+    payload.payment_method === 'manual' &&
+    manualPayment &&
+    order.payment_status !== 'submitted' &&
+    order.payment_status !== 'paid'
+  ) {
+    try {
+      await submitDropshippingManualPayment(
+        orderId,
+        manualPayment.provider,
+        manualPayment.senderNumber,
+        manualPayment.transactionId
+      );
+    } catch (error) {
+      paymentWarning = responseError(error, 'অর্ডার হয়েছে, কিন্তু পেমেন্ট তথ্য জমা হয়নি।');
+    }
   }
 
   return {
-    orderId: id,
+    orderId: displayOrderId,
+    ...(typeof order._id === 'string' ? { paymentReference: order._id } : {}),
     ...(Number.isFinite(total) ? { orderTotal: total } : {}),
     paymentWarning,
   };

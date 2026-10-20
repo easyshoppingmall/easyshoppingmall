@@ -168,6 +168,10 @@ export function formatDropshippingTaka(amount: number): string {
   return `৳${formatDropshippingNumber(amount)}`;
 }
 
+export function roundDropshippingMoney(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
 export function formatDropshippingNumber(amount: number): string {
   const digits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
   const formatted = amount.toLocaleString('en-IN').replace(/\d/g, (digit) => digits[Number(digit)]);

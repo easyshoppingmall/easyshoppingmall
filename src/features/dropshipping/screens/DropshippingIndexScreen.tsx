@@ -106,7 +106,9 @@ export function DropshippingIndexScreen() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const cartCount = useAppSelector((state) => state.cart.totalQuantity);
+  const cartCount = useAppSelector((state) =>
+    state.dropshippingCart.items.reduce((total, item) => total + item.quantity, 0)
+  );
   const profileQuery = useDropshippingProfileQuery();
   const bannersQuery = useDropshippingBannersQuery();
   const noticesQuery = useActiveDropshippingNoticesQuery();
@@ -295,7 +297,7 @@ export function DropshippingIndexScreen() {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel={`কার্ট, ${formatDropshippingNumber(cartCount)}টি পণ্য`}
-          onPress={() => router.push('/(ecommerce)/(tabs)/cart')}
+          onPress={() => router.push('/(dropshipping)/cart')}
           className="relative h-8 w-8 items-center justify-center"
         >
           <Ionicons name="cart-outline" size={21} color={colors.ink} />

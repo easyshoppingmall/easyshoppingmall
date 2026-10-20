@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
@@ -35,7 +35,11 @@ import {
   type DropshippingPaymentProvider,
   type DropshippingPaymentType,
 } from '../api/ordersApi';
-import { useDropshippingProductDetailsQuery } from '../api/queries';
+import type { DropshippingProduct } from '../api/homeApi';
+import {
+  useDropshippingProductDetailsQuery,
+  useSearchDropshippingProductsQuery,
+} from '../api/queries';
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -119,9 +123,18 @@ interface BangladeshDivision {
 type LocationField = 'division' | 'district' | 'upazila';
 const bangladeshLocations = bdLocations as BangladeshDivision[];
 
+interface DropshippingOrderItem {
+  product: DropshippingProduct;
+  quantity: string;
+  size: string;
+  color: string;
+  weight: string;
+}
+
 export function DropshippingOrderScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const orderSubmitInProgress = useRef(false);
   const params = useLocalSearchParams<{
     id?: string | string[];
     size?: string | string[];
@@ -130,6 +143,9 @@ export function DropshippingOrderScreen() {
   }>();
   const productId = firstParam(params.id);
   const productQuery = useDropshippingProductDetailsQuery(productId);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const searchProductsQuery = useSearchDropshippingProductsQuery(productSearch, 1);
   const user = useAppSelector((state) => state.auth.user);
   const product = productQuery.data;
   const [customerName, setCustomerName] = useState(user?.name ?? '');
@@ -141,13 +157,7 @@ export function DropshippingOrderScreen() {
   const [postCode, setPostCode] = useState('');
   const [locationPicker, setLocationPicker] = useState<LocationField | null>(null);
   const [locationSearch, setLocationSearch] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [variantSelection, setVariantSelection] = useState({
-    productId: '',
-    size: '',
-    color: '',
-    weight: '',
-  });
+  const [orderItemsState, setOrderItemsState] = useState<DropshippingOrderItem[] | null>(null);
   const [paymentProvider, setPaymentProvider] = useState<DropshippingPaymentProvider>('bkash');
   const [paymentType, setPaymentType] = useState<DropshippingPaymentType>('delivery');
   const [paymentNumber, setPaymentNumber] = useState('');
@@ -155,54 +165,65 @@ export function DropshippingOrderScreen() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{
     code: string;
-    productId: string;
-    quantity: number;
-    price: number;
+    cartKey: string;
     result: DropshippingCouponResult;
   }>();
   const [orderResult, setOrderResult] = useState<DropshippingOrderResult>();
   const [paymentRetryError, setPaymentRetryError] = useState('');
 
-  const selectedSize = variantSelection.productId === product?.id
-    ? variantSelection.size
-    : firstParam(params.size) || product?.sizes?.[0] || '';
-  const selectedColor = variantSelection.productId === product?.id
-    ? variantSelection.color
-    : firstParam(params.color) || product?.colors?.[0] || '';
-  const selectedWeight = variantSelection.productId === product?.id
-    ? variantSelection.weight
-    : firstParam(params.weight) || product?.weights?.[0] || '';
-  const changeVariant = (key: 'size' | 'color' | 'weight', value: string) => {
-    if (!product) return;
-    setVariantSelection({
-      productId: product.id,
-      size: key === 'size' ? value : selectedSize,
-      color: key === 'color' ? value : selectedColor,
-      weight: key === 'weight' ? value : selectedWeight,
-    });
+  const initialOrderItems: DropshippingOrderItem[] = product
+    ? [{
+          product,
+          quantity: '1',
+          size: firstParam(params.size) || product.sizes?.[0] || '',
+          color: firstParam(params.color) || product.colors?.[0] || '',
+          weight: firstParam(params.weight) || product.weights?.[0] || '',
+        }]
+    : [];
+  const orderItems = orderItemsState ?? initialOrderItems;
+  const setOrderItems = (update: (current: DropshippingOrderItem[]) => DropshippingOrderItem[]) => {
+    setOrderItemsState((current) => update(current ?? initialOrderItems));
   };
 
-  const parsedQuantity = Number(quantity);
-  const unitPrice = product?.dropshippingPrice;
-  const quantityIsValid = Number.isInteger(parsedQuantity) && parsedQuantity >= 1;
-  const subtotal = unitPrice === undefined || !quantityIsValid ? 0 : unitPrice * parsedQuantity;
+  const orderCartKey = orderItems
+    .map((item) => `${item.product.id}:${item.quantity}:${item.product.dropshippingPrice ?? ''}`)
+    .sort()
+    .join('|');
+  const validOrderItems = orderItems.flatMap((item) => {
+    const quantity = Number(item.quantity);
+    const cost = item.product.dropshippingPrice;
+    if (!Number.isInteger(quantity) || quantity < 1 || cost === undefined) return [];
+    return [{ ...item, parsedQuantity: quantity, cost }];
+  });
+  const quantityIsValid = validOrderItems.length === orderItems.length && orderItems.length > 0;
+  const subtotal = validOrderItems.reduce(
+    (total, item) => total + item.cost * item.parsedQuantity,
+    0
+  );
+  const allSuggestedPricesAvailable = validOrderItems.length === orderItems.length &&
+    validOrderItems.length > 0 &&
+    validOrderItems.every((item) => item.product.productRank !== undefined);
+  const suggestedSalesTotal = validOrderItems.reduce(
+    (total, item) => total + (item.product.productRank ?? 0) * item.parsedQuantity,
+    0
+  );
+  const estimatedProfit = allSuggestedPricesAvailable
+    ? validOrderItems.reduce(
+        (total, item) => total + ((item.product.productRank ?? item.cost) - item.cost) * item.parsedQuantity,
+        0
+      )
+    : undefined;
   const estimateDeliveryCharge = ['ঢাকা', 'dhaka'].includes(district.trim().toLocaleLowerCase())
     ? 80
     : 130;
   const activeCoupon =
     appliedCoupon &&
     appliedCoupon.code.toLocaleLowerCase() === couponCode.trim().toLocaleLowerCase() &&
-    appliedCoupon.productId === product?.id &&
-    appliedCoupon.quantity === parsedQuantity &&
-    appliedCoupon.price === unitPrice
+    appliedCoupon.cartKey === orderCartKey
       ? appliedCoupon
       : undefined;
-  const couponDiscount = activeCoupon?.result.discountAmount ?? 0;
+  const couponDiscount = Math.min(activeCoupon?.result.discountAmount ?? 0, subtotal);
   const totalEstimate = Math.max(0, subtotal + estimateDeliveryCharge - couponDiscount);
-  const estimatedProfit =
-    product?.productRank !== undefined && unitPrice !== undefined && quantityIsValid
-      ? (product.productRank - unitPrice) * parsedQuantity
-      : undefined;
   const locationOptions = useMemo(() => {
     if (locationPicker === 'division') {
       return bangladeshLocations.map((location) => location.division);
@@ -239,18 +260,21 @@ export function DropshippingOrderScreen() {
         error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
       );
     },
+    onSettled: () => {
+      orderSubmitInProgress.current = false;
+    },
   });
 
   const couponMutation = useMutation({
-    mutationFn: ({ code, productId, quantity, price }: {
+    mutationFn: ({ code, cartItems, cartKey }: {
       code: string;
-      productId: string;
-      quantity: number;
-      price: number;
-    }) => applyDropshippingCoupon(code, productId, quantity, price),
+      cartItems: { productId: string; quantity: number; price: number }[];
+      cartKey: string;
+    }) => applyDropshippingCoupon(code, cartItems),
     onSuccess: (result, variables) => {
       setAppliedCoupon({
-        ...variables,
+        code: variables.code,
+        cartKey: variables.cartKey,
         result,
       });
     },
@@ -274,16 +298,25 @@ export function DropshippingOrderScreen() {
   });
 
   const placeOrder = () => {
+    if (orderSubmitInProgress.current) return;
     if (!user?._id) {
       Alert.alert('লগইন প্রয়োজন', 'অর্ডার করার আগে আপনার অ্যাকাউন্টে লগইন করুন।');
       return;
     }
-    if (!product || unitPrice === undefined) {
-      Alert.alert('মূল্য পাওয়া যায়নি', 'এই পণ্যের dropshipping মূল্য না থাকায় অর্ডার করা যাচ্ছে না।');
+    if (!orderItems.length) {
+      Alert.alert('পণ্য যোগ করুন', 'অর্ডার করতে অন্তত একটি পণ্য যোগ করুন।');
       return;
     }
-    if (product.stockCount !== undefined && product.stockCount <= 0) {
-      Alert.alert('স্টক নেই', 'এই পণ্যটি বর্তমানে স্টকে নেই।');
+    const itemWithoutPrice = orderItems.find((item) => item.product.dropshippingPrice === undefined);
+    if (itemWithoutPrice) {
+      Alert.alert('মূল্য পাওয়া যায়নি', `${itemWithoutPrice.product.name}-এর dropshipping খরচ পাওয়া যায়নি।`);
+      return;
+    }
+    const outOfStockItem = orderItems.find((item) =>
+      item.product.stockCount !== undefined && item.product.stockCount <= 0
+    );
+    if (outOfStockItem) {
+      Alert.alert('স্টক নেই', `${outOfStockItem.product.name} বর্তমানে স্টকে নেই।`);
       return;
     }
     if (!customerName.trim() || !address.trim() || !division.trim() || !district.trim() || !upazila.trim()) {
@@ -294,24 +327,32 @@ export function DropshippingOrderScreen() {
       Alert.alert('মোবাইল নম্বর যাচাই করুন', '১০–১৪ সংখ্যার সঠিক মোবাইল নম্বর লিখুন।');
       return;
     }
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
-      Alert.alert('পরিমাণ যাচাই করুন', 'কমপক্ষে ১টি পণ্যের সঠিক পরিমাণ লিখুন।');
+    const invalidQuantityItem = orderItems.find((item) => {
+      const quantity = Number(item.quantity);
+      return !Number.isInteger(quantity) || quantity < 1;
+    });
+    if (invalidQuantityItem) {
+      Alert.alert('পরিমাণ যাচাই করুন', `${invalidQuantityItem.product.name}-এর সঠিক পরিমাণ লিখুন।`);
       return;
     }
-    if (product.stockCount !== undefined && parsedQuantity > product.stockCount) {
-      Alert.alert('স্টকের বেশি পরিমাণ', `সর্বোচ্চ ${formatDropshippingNumber(product.stockCount)}টি অর্ডার করতে পারবেন।`);
+    const exceedsStockItem = orderItems.find((item) => {
+      const quantity = Number(item.quantity);
+      return item.product.stockCount !== undefined && quantity > item.product.stockCount;
+    });
+    if (exceedsStockItem) {
+      Alert.alert(
+        'স্টকের বেশি পরিমাণ',
+        `${exceedsStockItem.product.name}-এর সর্বোচ্চ ${formatDropshippingNumber(exceedsStockItem.product.stockCount ?? 0)}টি অর্ডার করতে পারবেন।`
+      );
       return;
     }
-    if (product.sizes?.length && !selectedSize) {
-      Alert.alert('সাইজ বাছুন', 'অর্ডার করার আগে পণ্যের সাইজ নির্বাচন করুন।');
-      return;
-    }
-    if (product.colors?.length && !selectedColor) {
-      Alert.alert('রং বাছুন', 'অর্ডার করার আগে পণ্যের রং নির্বাচন করুন।');
-      return;
-    }
-    if (product.weights?.length && !selectedWeight) {
-      Alert.alert('ওজন বাছুন', 'অর্ডার করার আগে পণ্যের ওজন নির্বাচন করুন।');
+    const missingVariant = orderItems.find((item) =>
+      (item.product.sizes?.length && !item.size) ||
+      (item.product.colors?.length && !item.color) ||
+      (item.product.weights?.length && !item.weight)
+    );
+    if (missingVariant) {
+      Alert.alert('ভ্যারিয়েন্ট বাছুন', `${missingVariant.product.name}-এর সাইজ, রং বা ওজন নির্বাচন করুন।`);
       return;
     }
     if (!/^\d{10,14}$/.test(paymentNumber.trim()) || !transactionId.trim()) {
@@ -321,18 +362,14 @@ export function DropshippingOrderScreen() {
 
     const digits = phone.trim();
     const payload: CreateDropshippingOrderPayload = {
-      userId: user._id,
-      products: [{
-        productId: product.id,
-        name: product.name,
-        image: product.images ?? (product.image ? [product.image] : []),
-        price: unitPrice,
-        quantity: parsedQuantity,
-        totalPrice: subtotal,
-        ...(selectedSize ? { size: selectedSize } : {}),
-        ...(selectedColor ? { color: selectedColor } : {}),
-        ...(selectedWeight ? { weight: selectedWeight } : {}),
-      }],
+      products: validOrderItems.map((item) => ({
+        productId: item.product.id,
+        quantity: item.parsedQuantity,
+        sellingPrice: item.product.productRank ?? item.cost,
+        ...(item.size ? { size: item.size } : {}),
+        ...(item.color ? { color: item.color } : {}),
+        ...(item.weight ? { weight: item.weight } : {}),
+      })),
       delivery_address: {
         customer_name: customerName.trim(),
         address_line: address.trim(),
@@ -343,9 +380,6 @@ export function DropshippingOrderScreen() {
         country: 'Bangladesh',
         mobile: Number(digits),
       },
-      deliveryCharge: estimateDeliveryCharge,
-      subTotalAmt: subtotal,
-      totalAmt: totalEstimate,
       payment_method: 'manual',
       payment_type: paymentType,
       payment_details: {
@@ -356,9 +390,9 @@ export function DropshippingOrderScreen() {
           transactionId: transactionId.trim(),
         },
       },
-      ...(activeCoupon ? { appliedCoupon: activeCoupon.result.coupon } : {}),
-      couponDiscount,
+      ...(activeCoupon ? { appliedCoupon: activeCoupon.code } : {}),
     };
+    orderSubmitInProgress.current = true;
     orderMutation.mutate(payload);
   };
 
@@ -435,8 +469,26 @@ export function DropshippingOrderScreen() {
               </Text>
             ) : null}
             <View className="mt-5 rounded-2xl bg-bg p-4">
-              <Text className="mb-2 text-[12px] font-extrabold text-ink">গ্রাহকের অর্ডার</Text>
-              <Text className="text-[11px] text-muted">পণ্য: {product.name} × {formatDropshippingNumber(parsedQuantity)}</Text>
+              <Text className="mb-2 text-[12px] font-extrabold text-ink">
+                গ্রাহকের অর্ডার · {formatDropshippingNumber(orderItems.length)}টি পণ্য
+              </Text>
+              {orderItems.map((item) => {
+                const quantity = Number(item.quantity);
+                const itemCost = (item.product.dropshippingPrice ?? 0) * quantity;
+                const itemSales = (item.product.productRank ?? 0) * quantity;
+                return (
+                  <View key={item.product.id} className="mb-2 border-b border-line pb-2">
+                    <Text className="text-[11px] font-semibold text-ink">
+                      {item.product.name} × {formatDropshippingNumber(quantity)}
+                    </Text>
+                    <Text className="mt-1 text-[10px] text-muted">
+                      খরচ {formatDropshippingTaka(itemCost)} · প্রস্তাবিত বিক্রি {item.product.productRank === undefined
+                        ? 'তথ্য নেই'
+                        : formatDropshippingTaka(itemSales)}
+                    </Text>
+                  </View>
+                );
+              })}
               <Text className="mt-1 text-[11px] text-muted">গ্রাহক: {customerName} · {phone}</Text>
               <Text className="mt-1 text-[11px] text-muted">
                 ঠিকানা: {address}, {upazila}, {district}, {division}
@@ -448,7 +500,7 @@ export function DropshippingOrderScreen() {
               ) : null}
               {estimatedProfit !== undefined ? (
                 <Text className="mt-1 text-[11px] font-semibold text-emerald-700">
-                  আনুমানিক পণ্য-মার্জিন: {formatDropshippingTaka(estimatedProfit)} (কুপন/চার্জের আগে)
+                  আনুমানিক মোট পণ্য-মার্জিন: {formatDropshippingTaka(estimatedProfit)} (কুপনের আগে)
                 </Text>
               ) : null}
             </View>
@@ -487,55 +539,141 @@ export function DropshippingOrderScreen() {
             contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 28 }}
           >
             <View className="w-full max-w-[760px]">
-              <View className="mb-4 flex-row rounded-2xl border border-line bg-white p-3">
-                <Image
-                  source={{ uri: product.images?.[0] ?? product.image }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  style={{ width: 84, height: 84, borderRadius: 12, backgroundColor: '#F3F4F6' }}
-                />
-                <View className="ml-3 flex-1 justify-center">
-                  <Text numberOfLines={2} className="text-[13px] font-bold text-ink">{product.name}</Text>
-                  <Text className="mt-1 text-[11px] text-muted">ড্রপশিপিং মূল্য</Text>
-                  <Text className="text-[16px] font-extrabold text-primary">
-                    {product.dropshippingPrice === undefined
-                      ? 'মূল্য পাওয়া যায়নি'
-                      : formatDropshippingTaka(product.dropshippingPrice)}
-                  </Text>
-                  <Text className="mt-2 text-[10px] text-muted">প্রস্তাবিত বিক্রয়মূল্য (Product Rank)</Text>
-                  <Text className="text-[13px] font-bold text-ink">
-                    {product.productRank === undefined
-                      ? 'তথ্য পাওয়া যায়নি'
-                      : formatDropshippingTaka(product.productRank)}
-                  </Text>
-                  {product.productRank !== undefined && product.dropshippingPrice !== undefined ? (
-                    <Text className={`mt-1 text-[10px] font-bold ${product.productRank >= product.dropshippingPrice ? 'text-emerald-700' : 'text-red-600'}`}>
-                      আনুমানিক লাভ: {formatDropshippingTaka(product.productRank - product.dropshippingPrice)} / পিস
-                    </Text>
-                  ) : null}
-                  {product.stockCount !== undefined ? (
-                    <Text className={`mt-1 text-[10px] ${product.stockCount > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                      {product.stockCount > 0 ? `স্টকে ${formatDropshippingNumber(product.stockCount)}টি` : 'স্টক নেই'}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-
               <View className="rounded-[22px] border border-line bg-white p-4">
-                <Text className="mb-3 text-[14px] font-extrabold text-ink">পণ্যের ভ্যারিয়েন্ট</Text>
-                <ChoiceRow label="সাইজ" options={product.sizes ?? []} value={selectedSize} onSelect={(value) => changeVariant('size', value)} />
-                <ChoiceRow label="রং" options={product.colors ?? []} value={selectedColor} onSelect={(value) => changeVariant('color', value)} />
-                <ChoiceRow label="ওজন" options={product.weights ?? []} value={selectedWeight} onSelect={(value) => changeVariant('weight', value)} />
-                <FormField
-                  label="পরিমাণ"
-                  value={quantity}
-                  onChangeText={(value) => {
-                    setQuantity(value);
+                <View className="mb-3 flex-row items-center justify-between">
+                  <View>
+                    <Text className="text-[14px] font-extrabold text-ink">অর্ডারের পণ্য</Text>
+                    <Text className="mt-1 text-[10px] text-muted">
+                      {formatDropshippingNumber(orderItems.length)}টি পণ্য · পরিমাণ অনুযায়ী হিসাব
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setProductSearch('');
+                      setShowProductPicker(true);
+                    }}
+                    className="min-h-10 flex-row items-center rounded-xl bg-primary px-3"
+                  >
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
+                    <Text className="ml-1 text-[11px] font-bold text-white">পণ্য যোগ</Text>
+                  </Pressable>
+                </View>
+                {orderItems.map((item) => {
+                  const unitCost = item.product.dropshippingPrice;
+                  const parsedItemQuantity = Number(item.quantity);
+                  const quantityError = !Number.isInteger(parsedItemQuantity) || parsedItemQuantity < 1
+                    ? 'কমপক্ষে ১টি পূর্ণ সংখ্যা লিখুন।'
+                    : item.product.stockCount !== undefined && parsedItemQuantity > item.product.stockCount
+                      ? `স্টকে সর্বোচ্চ ${formatDropshippingNumber(item.product.stockCount)}টি আছে।`
+                      : undefined;
+                  const itemProfit = item.product.productRank !== undefined && unitCost !== undefined
+                    ? (item.product.productRank - unitCost) * (Number.isInteger(parsedItemQuantity) ? parsedItemQuantity : 0)
+                    : undefined;
+                  const updateItem = (changes: Partial<DropshippingOrderItem>) => {
+                    setOrderItems((current) => current.map((currentItem) =>
+                      currentItem.product.id === item.product.id
+                        ? { ...currentItem, ...changes }
+                        : currentItem
+                    ));
                     couponMutation.reset();
-                  }}
-                  placeholder="১"
-                  keyboardType="number-pad"
-                />
+                  };
+                  return (
+                    <View key={item.product.id} className="mb-3 rounded-2xl border border-line bg-bg p-3">
+                      <View className="flex-row">
+                        <Image
+                          source={{ uri: item.product.images?.[0] ?? item.product.image }}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          recyclingKey={item.product.id}
+                          style={{ width: 68, height: 68, borderRadius: 10, backgroundColor: '#F3F4F6' }}
+                        />
+                        <View className="ml-3 flex-1 justify-center">
+                          <Text numberOfLines={2} className="text-[12px] font-bold text-ink">
+                            {item.product.name}
+                          </Text>
+                          <Text className="mt-1 text-[10px] text-muted">
+                            পণ্য খরচ: {unitCost === undefined ? 'তথ্য নেই' : formatDropshippingTaka(unitCost)}
+                          </Text>
+                          <Text className="text-[10px] text-muted">
+                            প্রস্তাবিত বিক্রি: {item.product.productRank === undefined
+                              ? 'তথ্য নেই'
+                              : formatDropshippingTaka(item.product.productRank)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${item.product.name} সরান`}
+                          onPress={() => {
+                            setOrderItems((current) => current.filter(
+                              (currentItem) => currentItem.product.id !== item.product.id
+                            ));
+                            couponMutation.reset();
+                          }}
+                          className="h-9 w-9 items-center justify-center rounded-full bg-white"
+                        >
+                          <Ionicons name="trash-outline" size={17} color={colors.accent} />
+                        </Pressable>
+                      </View>
+                      <View className="mt-3 flex-row items-end">
+                        <View className="mr-3 flex-1">
+                          <FormField
+                            label="পরিমাণ"
+                            value={item.quantity}
+                            onChangeText={(value) => updateItem({ quantity: value })}
+                            placeholder="১"
+                            keyboardType="number-pad"
+                          />
+                        </View>
+                        <View className="mb-3 flex-1">
+                          <Text className="mb-1.5 text-[11px] font-semibold text-ink">মোট পণ্য খরচ</Text>
+                          <Text className="rounded-xl border border-line bg-white px-3.5 py-3 text-[13px] font-bold text-ink">
+                            {unitCost === undefined || !Number.isInteger(parsedItemQuantity) || parsedItemQuantity < 1
+                              ? '—'
+                              : formatDropshippingTaka(unitCost * parsedItemQuantity)}
+                          </Text>
+                        </View>
+                      </View>
+                      {quantityError ? (
+                        <Text className="mb-2 text-[10px] font-semibold text-red-600">{quantityError}</Text>
+                      ) : null}
+                      <ChoiceRow
+                        label="সাইজ"
+                        options={item.product.sizes ?? []}
+                        value={item.size}
+                        onSelect={(value) => updateItem({ size: value })}
+                      />
+                      <ChoiceRow
+                        label="রং"
+                        options={item.product.colors ?? []}
+                        value={item.color}
+                        onSelect={(value) => updateItem({ color: value })}
+                      />
+                      <ChoiceRow
+                        label="ওজন"
+                        options={item.product.weights ?? []}
+                        value={item.weight}
+                        onSelect={(value) => updateItem({ weight: value })}
+                      />
+                      {item.product.stockCount !== undefined ? (
+                        <Text className={`text-[10px] ${item.product.stockCount > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {item.product.stockCount > 0
+                            ? `স্টকে ${formatDropshippingNumber(item.product.stockCount)}টি`
+                            : 'স্টক নেই'}
+                        </Text>
+                      ) : null}
+                      {itemProfit !== undefined ? (
+                        <Text className={`mt-1 text-[10px] font-bold ${itemProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          আনুমানিক পণ্য লাভ: {formatDropshippingTaka(itemProfit)}
+                        </Text>
+                      ) : (
+                        <Text className="mt-1 text-[10px] text-amber-700">
+                          বিক্রয়মূল্য/লাভের তথ্য API-তে নেই
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
@@ -602,16 +740,17 @@ export function DropshippingOrderScreen() {
                       disabled={
                         couponMutation.isPending ||
                         !couponCode.trim() ||
-                        !product.dropshippingPrice ||
                         !quantityIsValid
                       }
                       onPress={() => {
-                        if (!product.dropshippingPrice) return;
                         couponMutation.mutate({
                           code: couponCode.trim(),
-                          productId: product.id,
-                          quantity: parsedQuantity,
-                          price: product.dropshippingPrice,
+                          cartKey: orderCartKey,
+                          cartItems: validOrderItems.map((item) => ({
+                            productId: item.product.id,
+                            quantity: item.parsedQuantity,
+                            price: item.cost,
+                          })),
                         });
                       }}
                       className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${couponMutation.isPending || !couponCode.trim() ? 'bg-primary/50' : 'bg-primary'}`}
@@ -638,23 +777,28 @@ export function DropshippingOrderScreen() {
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
                 <Text className="mb-3 text-[14px] font-extrabold text-ink">পেমেন্ট তথ্য</Text>
-                <View className="mb-3 flex-row">
+                <View className="mb-1 flex-row flex-wrap justify-between">
                   {([
                     ['bkash', 'বিকাশ'],
                     ['nagad', 'নগদ'],
+                    ['rocket', 'রকেট'],
+                    ['upay', 'উপায়'],
                   ] as const).map(([provider, label]) => (
                     <Pressable
                       key={provider}
                       accessibilityRole="radio"
                       accessibilityState={{ selected: paymentProvider === provider }}
                       onPress={() => setPaymentProvider(provider)}
-                      className={`mr-2 flex-1 flex-row items-center justify-center rounded-xl border py-3 ${paymentProvider === provider ? 'border-primary bg-primary-light' : 'border-line bg-bg'}`}
+                      className={`mb-2 w-[48%] flex-row items-center justify-center rounded-xl border py-3 ${paymentProvider === provider ? 'border-primary bg-primary-light' : 'border-line bg-bg'}`}
                     >
                       <Ionicons name={paymentProvider === provider ? 'radio-button-on' : 'radio-button-off'} size={17} color={paymentProvider === provider ? colors.primary : colors.muted} />
                       <Text className="ml-2 text-[12px] font-semibold text-ink">{label}</Text>
                     </Pressable>
                   ))}
                 </View>
+                <Text className="mb-2 text-[10px] leading-4 text-muted">
+                  এই API-তে bKash, Nagad, Rocket ও Upay manual payment সমর্থিত। Cash on Delivery এখনকার order API-তে নেই।
+                </Text>
                 <FormField label="যে নম্বর থেকে পেমেন্ট করেছেন" value={paymentNumber} onChangeText={setPaymentNumber} placeholder="01XXXXXXXXX" keyboardType="phone-pad" />
                 <FormField label="ট্রানজ্যাকশন আইডি" value={transactionId} onChangeText={setTransactionId} placeholder="TrxID" autoCapitalize="characters" />
                 <Text className="mb-2 text-[12px] font-bold text-ink">কত টাকা পেমেন্ট করেছেন?</Text>
@@ -678,18 +822,24 @@ export function DropshippingOrderScreen() {
 
               <View className="mt-4 rounded-[22px] border border-line bg-white p-4">
                 <Text className="mb-3 text-[14px] font-extrabold text-ink">অর্ডারের হিসাব</Text>
+                {allSuggestedPricesAvailable ? (
+                  <View className="mb-2 flex-row justify-between">
+                    <Text className="text-[12px] text-muted">প্রস্তাবিত বিক্রয়মূল্য মোট</Text>
+                    <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(suggestedSalesTotal)}</Text>
+                  </View>
+                ) : null}
+                <View className="mb-2 flex-row justify-between">
+                  <Text className="text-[12px] text-muted">পণ্য খরচ মোট</Text>
+                  <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(subtotal)}</Text>
+                </View>
                 {estimatedProfit !== undefined ? (
                   <View className="mb-2 flex-row justify-between">
-                    <Text className="text-[12px] text-muted">আনুমানিক লাভ (কুপন/চার্জের আগে)</Text>
+                    <Text className="text-[12px] text-muted">আনুমানিক মোট পণ্য লাভ</Text>
                     <Text className={`text-[12px] font-bold ${estimatedProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
                       {formatDropshippingTaka(estimatedProfit)}
                     </Text>
                   </View>
                 ) : null}
-                <View className="mb-2 flex-row justify-between">
-                  <Text className="text-[12px] text-muted">পণ্য × পরিমাণ</Text>
-                  <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(subtotal)}</Text>
-                </View>
                 {activeCoupon ? (
                   <View className="mb-2 flex-row justify-between">
                     <Text className="text-[12px] text-muted">কুপন ছাড়</Text>
@@ -701,19 +851,19 @@ export function DropshippingOrderScreen() {
                   <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(estimateDeliveryCharge)}</Text>
                 </View>
                 <View className="flex-row justify-between border-t border-line pt-2">
-                  <Text className="text-[13px] font-bold text-ink">আনুমানিক মোট</Text>
+                  <Text className="text-[13px] font-bold text-ink">সার্ভার অর্ডারের আনুমানিক মোট</Text>
                   <Text className="text-[15px] font-extrabold text-primary">{formatDropshippingTaka(totalEstimate)}</Text>
                 </View>
                 <Text className="mt-2 text-[10px] leading-4 text-muted">
-                  চূড়ান্ত পণ্যমূল্য ও ডেলিভারি চার্জ সার্ভার নিশ্চিত করবে।
+                  প্রস্তাবিত বিক্রয়মূল্য/লাভ অনুমান; বর্তমান API-তে custom selling price ও COD নেই। কুপন, ডেলিভারি ও চূড়ান্ত অর্ডার মোট সার্ভার নিশ্চিত করবে।
                 </Text>
               </View>
 
               <Pressable
                 accessibilityRole="button"
-                disabled={orderMutation.isPending || product.dropshippingPrice === undefined || product.stockCount === 0}
+                disabled={orderMutation.isPending || !quantityIsValid}
                 onPress={placeOrder}
-                className={`mt-4 min-h-12 flex-row items-center justify-center rounded-2xl px-5 py-3.5 ${orderMutation.isPending || product.dropshippingPrice === undefined || product.stockCount === 0 ? 'bg-primary/50' : 'bg-primary'}`}
+                className={`mt-4 min-h-12 flex-row items-center justify-center rounded-2xl px-5 py-3.5 ${orderMutation.isPending || !quantityIsValid ? 'bg-primary/50' : 'bg-primary'}`}
               >
                 {orderMutation.isPending ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -727,6 +877,119 @@ export function DropshippingOrderScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        <Modal
+          animationType="slide"
+          transparent
+          visible={showProductPicker}
+          onRequestClose={() => setShowProductPicker(false)}
+        >
+          <View className="flex-1 justify-end bg-black/40">
+            <View className="max-h-[84%] rounded-t-3xl bg-white px-4 pb-6 pt-4">
+              <View className="mb-3 flex-row items-center justify-between">
+                <View>
+                  <Text className="text-[16px] font-bold text-ink">অর্ডারে পণ্য যোগ করুন</Text>
+                  <Text className="mt-1 text-[10px] text-muted">নাম দিয়ে খুঁজুন; API থেকে live মূল্য আসবে</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="পণ্য নির্বাচন বন্ধ করুন"
+                  onPress={() => setShowProductPicker(false)}
+                  className="p-1"
+                >
+                  <Ionicons name="close" size={23} color={colors.ink} />
+                </Pressable>
+              </View>
+              <TextInput
+                value={productSearch}
+                onChangeText={setProductSearch}
+                placeholder="পণ্যের নাম লিখুন"
+                placeholderTextColor={colors.muted}
+                className="mb-3 rounded-xl border border-line bg-bg px-3 py-3 text-[13px] text-ink"
+              />
+              {searchProductsQuery.isPending && productSearch.trim().length >= 2 ? (
+                <View className="items-center py-8">
+                  <ActivityIndicator color={colors.primary} />
+                  <Text className="mt-2 text-[11px] text-muted">পণ্য খোঁজা হচ্ছে...</Text>
+                </View>
+              ) : searchProductsQuery.isError ? (
+                <Text className="py-6 text-center text-[12px] text-red-600">
+                  {searchProductsQuery.error.message || 'পণ্য খোঁজা যায়নি।'}
+                </Text>
+              ) : productSearch.trim().length < 2 ? (
+                <Text className="py-6 text-center text-[12px] text-muted">
+                  খুঁজতে কমপক্ষে ২টি অক্ষর লিখুন।
+                </Text>
+              ) : (
+                <FlatList
+                  data={searchProductsQuery.data?.products ?? []}
+                  keyExtractor={(searchProduct) => searchProduct.id}
+                  keyboardShouldPersistTaps="handled"
+                  ListEmptyComponent={
+                    searchProductsQuery.isFetching ? (
+                      <ActivityIndicator className="py-6" color={colors.primary} />
+                    ) : (
+                      <Text className="py-6 text-center text-[12px] text-muted">
+                        কোনো পণ্য পাওয়া যায়নি।
+                      </Text>
+                    )
+                  }
+                  renderItem={({ item: searchProduct }) => {
+                    const alreadyAdded = orderItems.some(
+                      (orderItem) => orderItem.product.id === searchProduct.id
+                    );
+                    const unavailable = searchProduct.dropshippingPrice === undefined ||
+                      searchProduct.stockCount === 0;
+                    return (
+                      <View className="mb-2 flex-row items-center rounded-xl border border-line bg-bg p-2.5">
+                        <Image
+                          source={{ uri: searchProduct.images?.[0] ?? searchProduct.image }}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          recyclingKey={searchProduct.id}
+                          style={{ width: 52, height: 52, borderRadius: 9, backgroundColor: '#F3F4F6' }}
+                        />
+                        <View className="ml-2.5 flex-1">
+                          <Text numberOfLines={2} className="text-[11px] font-semibold text-ink">
+                            {searchProduct.name}
+                          </Text>
+                          <Text className="mt-1 text-[10px] text-muted">
+                            খরচ {searchProduct.dropshippingPrice === undefined
+                              ? 'তথ্য নেই'
+                              : formatDropshippingTaka(searchProduct.dropshippingPrice)}
+                            {' · '}বিক্রি {searchProduct.productRank === undefined
+                              ? 'তথ্য নেই'
+                              : formatDropshippingTaka(searchProduct.productRank)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={alreadyAdded || unavailable}
+                          onPress={() => {
+                            if (alreadyAdded || unavailable) return;
+                            setOrderItems((current) => [...current, {
+                              product: searchProduct,
+                              quantity: '1',
+                              size: searchProduct.sizes?.[0] ?? '',
+                              color: searchProduct.colors?.[0] ?? '',
+                              weight: searchProduct.weights?.[0] ?? '',
+                            }]);
+                            couponMutation.reset();
+                            setShowProductPicker(false);
+                          }}
+                          className={`ml-2 rounded-lg px-3 py-2 ${alreadyAdded || unavailable ? 'bg-line' : 'bg-primary'}`}
+                        >
+                          <Text className={`text-[10px] font-bold ${alreadyAdded || unavailable ? 'text-muted' : 'text-white'}`}>
+                            {alreadyAdded ? 'যোগ হয়েছে' : unavailable ? 'পাওয়া যাবে না' : 'যোগ করুন'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  }}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
         <Modal
           animationType="slide"
           transparent

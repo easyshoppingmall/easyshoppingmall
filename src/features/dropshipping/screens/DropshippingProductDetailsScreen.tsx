@@ -26,7 +26,8 @@ import {
   addDropshippingWishlistProduct,
   removeDropshippingWishlistProduct,
 } from '../api/wishlistApi';
-import { useAppSelector } from '../../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { addDropshippingCartItem } from '../../../store/dropshippingCartSlice';
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? '' : value ?? '';
@@ -35,6 +36,7 @@ function firstParam(value: string | string[] | undefined): string {
 export function DropshippingProductDetailsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const userId = useAppSelector((state) => state.auth.user?._id);
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const productId = firstParam(params.id);
@@ -64,6 +66,14 @@ export function DropshippingProductDetailsScreen() {
   const selectedWeight = variantSelection.productId === product?.id
     ? variantSelection.weight
     : product?.weights?.[0] ?? '';
+  const selectedCartQuantity = useAppSelector((state) => state.dropshippingCart.items.find((item) =>
+    item.product.id === product?.id &&
+    item.size === selectedSize &&
+    item.color === selectedColor &&
+    item.weight === selectedWeight
+  )?.quantity ?? 0);
+  const cannotAddSelectedStock = product?.stockCount !== undefined &&
+    selectedCartQuantity >= product.stockCount;
 
   const downloadMutation = useMutation({
     mutationFn: () => {
@@ -355,23 +365,25 @@ export function DropshippingProductDetailsScreen() {
 
             <Pressable
               accessibilityRole="button"
-              disabled={product.dropshippingPrice === undefined || (product.stockCount !== undefined && product.stockCount <= 0)}
-              onPress={() =>
-                router.push({
-                  pathname: '/(dropshipping)/order/[id]',
-                  params: {
-                    id: product.id,
-                    ...(selectedSize ? { size: selectedSize } : {}),
-                    ...(selectedColor ? { color: selectedColor } : {}),
-                    ...(selectedWeight ? { weight: selectedWeight } : {}),
-                  },
-                })
-              }
-              className={`mt-5 min-h-12 flex-row items-center justify-center rounded-xl px-4 py-3 ${product.dropshippingPrice === undefined || (product.stockCount !== undefined && product.stockCount <= 0) ? 'bg-primary/50' : 'bg-primary'}`}
+              disabled={product.dropshippingPrice === undefined ||
+                (product.stockCount !== undefined && product.stockCount <= 0) ||
+                cannotAddSelectedStock}
+              onPress={() => {
+                dispatch(addDropshippingCartItem({
+                  product,
+                  size: selectedSize,
+                  color: selectedColor,
+                  weight: selectedWeight,
+                }));
+                router.push('/(dropshipping)/cart');
+              }}
+              className={`mt-5 min-h-12 flex-row items-center justify-center rounded-xl px-4 py-3 ${product.dropshippingPrice === undefined || (product.stockCount !== undefined && product.stockCount <= 0) || cannotAddSelectedStock ? 'bg-primary/50' : 'bg-primary'}`}
             >
               <Ionicons name="bag-check-outline" size={18} color="#FFFFFF" />
               <Text className="ml-2 text-[12px] font-bold text-white">
-                {product.stockCount === 0 ? 'স্টক নেই' : 'অর্ডার করুন'}
+                {product.stockCount === 0
+                  ? 'স্টক নেই'
+                  : cannotAddSelectedStock ? 'স্টক সীমা কার্টে যোগ হয়েছে' : 'কার্টে যোগ করে Checkout'}
               </Text>
             </Pressable>
           </View>
