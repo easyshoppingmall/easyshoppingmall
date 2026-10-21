@@ -10,6 +10,7 @@ export interface DropshippingOrderSummary {
   totalAmount?: number;
   totalPrice?: number;
   createdAt?: string;
+  [key: string]: unknown;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -34,8 +35,10 @@ export function dropshippingProfileErrorMessage(value: unknown, fallback: string
   return errorMessage(value, fallback);
 }
 
-export async function getDropshippingOrders(): Promise<DropshippingOrderSummary[]> {
-  const { data } = await apiClient.get('/api/orders/my-orders');
+export async function getDropshippingOrders(
+  signal?: AbortSignal
+): Promise<DropshippingOrderSummary[]> {
+  const { data } = await apiClient.get('/api/orders/my-orders', { signal });
   const root = asRecord(data);
   if (root?.success === false) {
     throw new Error(errorMessage(data, 'অর্ডারের তথ্য লোড করা যায়নি।'));

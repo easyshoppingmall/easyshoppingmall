@@ -10,6 +10,7 @@ import { DropshippingSearchScreen } from './DropshippingSearchScreen';
 import { DropshippingAllProductsScreen } from './DropshippingAllProductsScreen';
 import { DropshippingProfileScreen } from './DropshippingProfileScreen';
 import { DropshippingWishlistScreen } from './DropshippingWishlistScreen';
+import { DropshippingOrdersScreen } from './DropshippingOrdersScreen';
 
 const SECTIONS: Record<
   string,
@@ -120,6 +121,7 @@ export function DropshippingSectionScreen() {
     return <DropshippingProfileScreen />;
   }
   if (section === 'wishlist') return <DropshippingWishlistScreen />;
+  if (section === 'order-list') return <DropshippingOrdersScreen />;
   if (section === 'all-products' || section === 'new-products') {
     return <DropshippingAllProductsScreen />;
   }

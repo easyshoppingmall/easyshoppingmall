@@ -16,7 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { authApi, type UpdateOwnProfilePayload, type UserProfile } from '../../../api/authApi';
 import { signOut, updateCurrentUser } from '../../../store/authSlice';
@@ -25,11 +25,11 @@ import { colors } from '../../../shared/theme/colors';
 import { formatDropshippingNumber, formatDropshippingTaka } from '../api/homeApi';
 import {
   dropshippingHomeQueryKeys,
+  useDropshippingOrdersQuery,
   useDropshippingProfileDashboardQuery,
 } from '../api/queries';
 import {
   dropshippingProfileErrorMessage,
-  getDropshippingOrders,
   updateDropshippingUserImage,
 } from '../api/profileApi';
 
@@ -197,12 +197,7 @@ export function DropshippingProfileScreen() {
   const profileDashboardQuery = useDropshippingProfileDashboardQuery();
   const profile = profileDashboardQuery.data?.user ?? sessionUser ?? undefined;
   const referralData = profileDashboardQuery.data?.referrals;
-  const ordersQuery = useQuery({
-    queryKey: ['dropshipping', 'profile', 'orders', userId],
-    queryFn: getDropshippingOrders,
-    enabled: Boolean(userId),
-    staleTime: 60_000,
-  });
+  const ordersQuery = useDropshippingOrdersQuery();
   const orders = ordersQuery.data ?? [];
   const commission = (referralData?.orders ?? []).reduce(
     (total, order) => total + (Number(order.referralBonusAmount) || 0),

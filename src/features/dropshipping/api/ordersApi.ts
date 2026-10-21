@@ -1,4 +1,5 @@
 import { apiClient } from '../../../api/client';
+import { isAxiosError } from 'axios';
 
 export type DropshippingPaymentProvider = 'bkash' | 'nagad' | 'rocket' | 'upay';
 export type DropshippingPaymentType = 'delivery' | 'full';
@@ -93,8 +94,52 @@ function responseError(value: unknown, fallback: string): string {
   const root = record(value);
   const response = record(root?.response);
   const data = record(response?.data);
-  const message = data?.message ?? root?.message;
-  return typeof message === 'string' && message.trim() ? message : fallback;
+  const message = data?.message ?? data?.error ?? root?.message;
+  if (typeof message === 'string' && message.trim() && !/^request failed with status code \d+$/i.test(message)) {
+    return message;
+  }
+  if (isAxiosError(value)) {
+    if (value.response?.status === 403) {
+      return 'এই অর্ডারটি দেখার অনুমতি নেই। নিজের অর্ডার তালিকা থেকে অর্ডারটি খুলুন।';
+    }
+    if (value.response?.status === 404) {
+      return 'অর্ডারটি পাওয়া যায়নি। অর্ডার তালিকা রিফ্রেশ করে আবার চেষ্টা করুন।';
+    }
+  }
+  return fallback;
+}
+
+export type DropshippingOrderRecord = Record<string, unknown>;
+
+export async function getDropshippingOrderDetails(
+  orderId: string,
+  signal?: AbortSignal
+): Promise<DropshippingOrderRecord> {
+  if (!orderId.trim()) {
+    throw new Error('অর্ডার আইডি পাওয়া যায়নি। অর্ডার তালিকা থেকে আবার খুলুন।');
+  }
+  const { data } = await apiClient.get(
+    `/api/orders/${encodeURIComponent(orderId)}`,
+    { signal }
+  );
+  const root = record(data);
+  if (!root || root.success === false) {
+    throw new Error(responseError(data, 'অর্ডারের বিস্তারিত আনা যায়নি।'));
+  }
+
+  const dataRecord = record(root.data);
+  const body = record(dataRecord?.order) ?? record(dataRecord?.data) ??
+    dataRecord ?? record(root.order) ?? root;
+  const responseIds = [body._id, body.id, body.orderId, body.orderNumber]
+    .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+    .map((value) => value.trim());
+  if (!responseIds.length) {
+    throw new Error('সার্ভার থেকে অর্ডারের সঠিক তথ্য পাওয়া যায়নি।');
+  }
+  if (!responseIds.includes(orderId.trim())) {
+    throw new Error('সার্ভার থেকে অন্য অর্ডারের তথ্য এসেছে। নিরাপত্তার জন্য এটি দেখানো হয়নি।');
+  }
+  return body;
 }
 
 export async function submitDropshippingManualPayment(

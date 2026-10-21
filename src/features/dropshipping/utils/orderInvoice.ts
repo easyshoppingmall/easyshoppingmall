@@ -1,0 +1,139 @@
+import { Image } from 'react-native';
+
+export interface DropshippingInvoiceItem {
+  name: string;
+  quantity: string;
+  costPrice: string;
+  sellingPrice: string;
+  totalPrice: string;
+  profit: string;
+}
+
+export interface DropshippingInvoiceData {
+  orderId: string;
+  orderDate: string;
+  orderStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  subtotal: string;
+  deliveryCharge: string;
+  total: string;
+  totalCost: string;
+  estimatedProfit: string;
+  paid: string;
+  codAmount: string;
+  shopName: string;
+  shopOwner: string;
+  shopAddress: string;
+  shopWebsite: string;
+  shopLogo?: string;
+  items: DropshippingInvoiceItem[];
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return entities[character];
+  });
+}
+
+export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData): string {
+  const defaultLogo = Image.resolveAssetSource(require('../../../../assets/icon.png'))?.uri;
+  const logo = defaultLogo || '';
+  const rows = invoice.items.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.name)}</td>
+      <td class="center">${escapeHtml(item.quantity)}</td>
+      <td class="right">${escapeHtml(item.costPrice)}</td>
+      <td class="right">${escapeHtml(item.sellingPrice)}</td>
+      <td class="right">${escapeHtml(item.totalPrice)}</td>
+      <td class="right">${escapeHtml(item.profit)}</td>
+    </tr>
+  `).join('');
+
+  return `<!doctype html>
+  <html lang="bn">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 28px; color: #12263A; font: 13px Arial, sans-serif; }
+        .brand { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #0092EE; padding-bottom: 16px; }
+        .logo { width: 54px; height: 54px; border-radius: 12px; object-fit: contain; }
+        h1 { margin: 0; color: #0077C2; font-size: 19px; }
+        .muted { margin-top: 4px; color: #64748B; font-size: 11px; }
+        .title { margin: 22px 0 12px; font-size: 18px; }
+        .box { margin: 12px 0; padding: 14px; border: 1px solid #E3EAF1; border-radius: 12px; }
+        .row { display: flex; justify-content: space-between; gap: 20px; margin: 8px 0; }
+        .label { color: #64748B; }
+        .value { text-align: right; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border-bottom: 1px solid #E3EAF1; padding: 10px 6px; text-align: left; }
+        th { color: #64748B; font-size: 10px; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .total { color: #0077C2; font-size: 15px; font-weight: 700; }
+        .footer { margin-top: 22px; color: #64748B; text-align: center; font-size: 10px; }
+        @media print { body { padding: 10px; } }
+      </style>
+    </head>
+    <body>
+      <header class="brand">
+        ${logo ? `<img class="logo" src="${escapeHtml(logo)}" />` : ''}
+        <div>
+          <h1>EasyShoppingMallBD</h1>
+          <div class="muted">easyshoppingmallbd.com</div>
+        </div>
+      </header>
+      <h2 class="title">অর্ডার ইনভয়েস</h2>
+      <section class="box">
+        <div class="row"><span class="label">অর্ডার আইডি</span><span class="value">${escapeHtml(invoice.orderId)}</span></div>
+        <div class="row"><span class="label">তারিখ</span><span class="value">${escapeHtml(invoice.orderDate)}</span></div>
+        <div class="row"><span class="label">অর্ডারের অবস্থা</span><span class="value">${escapeHtml(invoice.orderStatus)}</span></div>
+        <div class="row"><span class="label">পেমেন্টের অবস্থা</span><span class="value">${escapeHtml(invoice.paymentStatus)}</span></div>
+      </section>
+      <section class="box">
+        <strong>ড্রপশিপার / শপ</strong>
+        ${invoice.shopLogo ? `<img class="logo" src="${escapeHtml(invoice.shopLogo)}" />` : ''}
+        <div class="row"><span class="label">শপের নাম</span><span class="value">${escapeHtml(invoice.shopName)}</span></div>
+        <div class="row"><span class="label">অ্যাকাউন্টের নাম</span><span class="value">${escapeHtml(invoice.shopOwner)}</span></div>
+        ${invoice.shopAddress ? `<div class="row"><span class="label">শপের ঠিকানা</span><span class="value">${escapeHtml(invoice.shopAddress)}</span></div>` : ''}
+        ${invoice.shopWebsite ? `<div class="row"><span class="label">শপের ওয়েবসাইট</span><span class="value">${escapeHtml(invoice.shopWebsite)}</span></div>` : ''}
+      </section>
+      <section class="box">
+        <strong>গ্রাহকের তথ্য</strong>
+        <div class="row"><span class="label">নাম</span><span class="value">${escapeHtml(invoice.customerName)}</span></div>
+        <div class="row"><span class="label">মোবাইল</span><span class="value">${escapeHtml(invoice.customerPhone)}</span></div>
+        <div class="row"><span class="label">ঠিকানা</span><span class="value">${escapeHtml(invoice.customerAddress)}</span></div>
+      </section>
+      <section class="box">
+        <strong>পণ্যের বিবরণ</strong>
+        <table>
+          <thead><tr><th>পণ্য</th><th class="center">পরিমাণ</th><th class="right">ক্রয়মূল্য</th><th class="right">বিক্রয়মূল্য</th><th class="right">সর্বমোট</th><th class="right">লাভ</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6">পণ্যের তথ্য পাওয়া যায়নি।</td></tr>'}</tbody>
+        </table>
+      </section>
+      <section class="box">
+        <div class="row"><span class="label">সাবটোটাল</span><span class="value">${escapeHtml(invoice.subtotal)}</span></div>
+        <div class="row"><span class="label">ডেলিভারি চার্জ</span><span class="value">${escapeHtml(invoice.deliveryCharge)}</span></div>
+        <div class="row total"><span>সর্বমোট</span><span>${escapeHtml(invoice.total)}</span></div>
+        <div class="row"><span class="label">মোট পণ্যের ক্রয়মূল্য</span><span class="value">${escapeHtml(invoice.totalCost)}</span></div>
+        <div class="row"><span class="label">সম্ভাব্য লাভ</span><span class="value">${escapeHtml(invoice.estimatedProfit)}</span></div>
+        <div class="row"><span class="label">পরিশোধিত</span><span class="value">${escapeHtml(invoice.paid)}</span></div>
+        <div class="row"><span class="label">ক্যাশ অন ডেলিভারি</span><span class="value">${escapeHtml(invoice.codAmount)}</span></div>
+        <div class="row"><span class="label">পেমেন্ট মাধ্যম</span><span class="value">${escapeHtml(invoice.paymentMethod)}</span></div>
+      </section>
+      <footer class="footer">এই ইনভয়েস EasyShoppingMallBD অ্যাপ থেকে তৈরি করা হয়েছে।</footer>
+    </body>
+  </html>`;
+}

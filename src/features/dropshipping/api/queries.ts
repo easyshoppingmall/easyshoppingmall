@@ -14,6 +14,8 @@ import {
   type DropshippingProductType,
 } from './homeApi';
 import { getDropshippingWishlist } from './wishlistApi';
+import { getDropshippingOrders } from './profileApi';
+import { getDropshippingOrderDetails } from './ordersApi';
 
 export const dropshippingHomeQueryKeys = {
   profile: (userId: string) => ['dropshipping', 'profile', userId] as const,
@@ -32,7 +34,30 @@ export const dropshippingHomeQueryKeys = {
   profileDashboard: (userId: string) =>
     ['dropshipping', 'profile-dashboard', userId] as const,
   wishlist: (userId: string) => ['dropshipping', 'wishlist', userId] as const,
+  orders: (userId: string) => ['dropshipping', 'orders', userId] as const,
+  orderDetails: (userId: string, orderId: string) =>
+    ['dropshipping', 'order-details', userId, orderId] as const,
 };
+
+export function useDropshippingOrdersQuery() {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.orders(userId ?? ''),
+    queryFn: ({ signal }) => getDropshippingOrders(signal),
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+  });
+}
+
+export function useDropshippingOrderDetailsQuery(orderId: string) {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.orderDetails(userId ?? '', orderId),
+    queryFn: ({ signal }) => getDropshippingOrderDetails(orderId, signal),
+    enabled: Boolean(userId && orderId),
+    staleTime: 30_000,
+  });
+}
 
 export function useDropshippingProfileQuery() {
   const userId = useAppSelector((state) => state.auth.user?._id);
