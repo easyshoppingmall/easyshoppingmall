@@ -16,6 +16,10 @@ import {
 import { getDropshippingWishlist } from './wishlistApi';
 import { getDropshippingOrders } from './profileApi';
 import { getDropshippingOrderDetails } from './ordersApi';
+import {
+  getDropshippingAnalytics,
+  getDropshippingPaymentRequests,
+} from './workspaceApi';
 
 export const dropshippingHomeQueryKeys = {
   profile: (userId: string) => ['dropshipping', 'profile', userId] as const,
@@ -37,7 +41,30 @@ export const dropshippingHomeQueryKeys = {
   orders: (userId: string) => ['dropshipping', 'orders', userId] as const,
   orderDetails: (userId: string, orderId: string) =>
     ['dropshipping', 'order-details', userId, orderId] as const,
+  analytics: (userId: string) => ['dropshipping', 'analytics', userId] as const,
+  paymentRequests: (userId: string) =>
+    ['dropshipping', 'payment-requests', userId] as const,
 };
+
+export function useDropshippingAnalyticsQuery() {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.analytics(userId ?? ''),
+    queryFn: ({ signal }) => getDropshippingAnalytics(signal),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+}
+
+export function useDropshippingPaymentRequestsQuery() {
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  return useQuery({
+    queryKey: dropshippingHomeQueryKeys.paymentRequests(userId ?? ''),
+    queryFn: ({ signal }) => getDropshippingPaymentRequests(signal),
+    enabled: Boolean(userId),
+    staleTime: 30_000,
+  });
+}
 
 export function useDropshippingOrdersQuery() {
   const userId = useAppSelector((state) => state.auth.user?._id);

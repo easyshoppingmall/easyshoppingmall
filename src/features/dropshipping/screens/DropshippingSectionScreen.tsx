@@ -11,6 +11,11 @@ import { DropshippingAllProductsScreen } from './DropshippingAllProductsScreen';
 import { DropshippingProfileScreen } from './DropshippingProfileScreen';
 import { DropshippingWishlistScreen } from './DropshippingWishlistScreen';
 import { DropshippingOrdersScreen } from './DropshippingOrdersScreen';
+import {
+  DropshippingAnalyticsScreen,
+  DropshippingDashboardScreen,
+  DropshippingPaymentRequestScreen,
+} from './DropshippingWorkspaceScreens';
 
 const SECTIONS: Record<
   string,
@@ -57,8 +62,13 @@ const SECTIONS: Record<
     icon: 'play-circle-outline',
   },
   'seller-dashboard': {
-    title: 'Seller Dashboard',
-    description: 'বিক্রির সারসংক্ষেপ ও ব্যবস্থাপনা',
+    title: 'ড্রপশিপিং ড্যাশবোর্ড',
+    description: 'অর্ডার, ব্যালেন্স ও ব্যবসার সারসংক্ষেপ',
+    icon: 'bar-chart-outline',
+  },
+  dashboard: {
+    title: 'ড্রপশিপিং ড্যাশবোর্ড',
+    description: 'অর্ডার, ব্যালেন্স ও ব্যবসার সারসংক্ষেপ',
     icon: 'bar-chart-outline',
   },
   'order-list': {
@@ -82,22 +92,22 @@ const SECTIONS: Record<
     icon: 'search-outline',
   },
   'my-analytics': {
-    title: 'My Analytics',
+    title: 'আমার অ্যানালিটিক্স',
     description: 'আপনার ড্রপশিপিং কার্যক্রমের পরিসংখ্যান',
     icon: 'analytics-outline',
   },
   'shop-settings': {
-    title: 'Shop Settings',
+    title: 'শপ সেটিংস',
     description: 'আপনার দোকানের সেটিংস',
     icon: 'settings-outline',
   },
   'referral-profile': {
-    title: 'Referral Profile',
+    title: 'রেফারেল প্রোফাইল',
     description: 'রেফারেল প্রোফাইল ও তথ্য',
     icon: 'people-outline',
   },
   'payment-request': {
-    title: 'Payment Request',
+    title: 'পেমেন্ট অনুরোধ',
     description: 'পেমেন্ট অনুরোধ ও তার অবস্থা',
     icon: 'wallet-outline',
   },
@@ -117,11 +127,16 @@ export function DropshippingSectionScreen() {
   const profile = profileQuery.data;
 
   if (section === 'search-products') return <DropshippingSearchScreen />;
-  if (section === 'account' || section === 'referral-profile') {
+  if (section === 'account' || section === 'referral-profile' || section === 'shop-settings') {
     return <DropshippingProfileScreen />;
   }
   if (section === 'wishlist') return <DropshippingWishlistScreen />;
   if (section === 'order-list') return <DropshippingOrdersScreen />;
+  if (section === 'my-analytics') return <DropshippingAnalyticsScreen />;
+  if (section === 'seller-dashboard' || section === 'dashboard') {
+    return <DropshippingDashboardScreen />;
+  }
+  if (section === 'payment-request') return <DropshippingPaymentRequestScreen />;
   if (section === 'all-products' || section === 'new-products') {
     return <DropshippingAllProductsScreen />;
   }

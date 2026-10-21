@@ -54,13 +54,13 @@ const DRAWER_ITEMS: DrawerItem[] = [
   { label: 'New Products', destination: 'new-products' },
   { label: 'Wishlist', destination: 'wishlist' },
   { label: 'Order List', destination: 'orders' },
-  { label: 'My Analytics', destination: 'section', section: 'my-analytics' },
+  { label: 'আমার অ্যানালিটিক্স', destination: 'section', section: 'my-analytics' },
   { label: 'Videos', destination: 'section', section: 'video' },
-  { label: 'Shop Settings', destination: 'section', section: 'shop-settings' },
-  { label: 'Referral Profile', destination: 'section', section: 'referral-profile' },
-  { label: 'Payment Request', destination: 'section', section: 'payment-request' },
+  { label: 'শপ সেটিংস', destination: 'section', section: 'shop-settings' },
+  { label: 'রেফারেল প্রোফাইল', destination: 'section', section: 'referral-profile' },
+  { label: 'পেমেন্ট অনুরোধ', destination: 'section', section: 'payment-request' },
   { label: 'Support', destination: 'section', section: 'support' },
-  { label: 'Dashboard', destination: 'section', section: 'seller-dashboard' },
+  { label: 'ড্যাশবোর্ড', destination: 'section', section: 'seller-dashboard' },
 ];
 
 function NoticeCard({ notice }: { notice: DropshippingNotice }) {
