@@ -264,9 +264,9 @@ After creating the order, call `POST /api/orders/manual-payment` separately with
 
 | Method | Full URL | কাজ |
 |---|---|---|
-| GET | `https://api.easyshoppingmallbd.com/api/analytics/dropshipping/my-summary` | Login করা dropshipper-এর নিজের summary দেখা |
+| GET | `https://api.easyshoppingmallbd.com/api/analytics/dropshipping/my-summary` | Login করা dropshipper-এর নিজের summary দেখা; optional `startDate` এবং `endDate` query parameter-এ date range পাঠানো যায় |
 
-Seller Dashboard-এর ব্যবহৃত response shape: `data.transactions` একটি `type`, `status`, `date`, `amount`-যুক্ত লেনদেনের তালিকা; `data.orderPipeline`-এ `pending`, `processing`, `shipped`, `delivered` order count থাকে। Frontend Monthly Profit ও Revenue Trend লেনদেন থেকে হিসাব করে। সাম্প্রতিক অর্ডার, অর্ডার status এবং Top Products-এর জন্য authenticated `GET /api/orders/my-orders` response ব্যবহার করা হয়।
+Response-এ `data.summary`-এর `currentBalance`, `totalProfit`, `pendingProfit`, `referralIncome` হলো analytics metric; `data.transactions`-এ `type`, `status`, `date`, `amount` এবং optional `user`/`orderId` থাকে। `data.orderPipeline`-এ status অনুযায়ী order count এবং `data.videoReferrals`-এ buyer/course/payment/bonus/status তথ্য থাকে। Seller Dashboard ও My Analytics এগুলো authenticated request-এ ব্যবহার করে। Referral partner-এর নাম/অর্ডারের তথ্য authenticated `GET /api/users/userprofile` response থেকে আসে। My Analytics-এর 7/30 দিন ও Custom filter API-তে ISO `startDate`/`endDate` পাঠায়; All Time-এ date parameter বাদ থাকে।
 
 ## Dropshipping Orders
 

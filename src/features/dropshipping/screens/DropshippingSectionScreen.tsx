@@ -14,10 +14,10 @@ import { DropshippingWishlistScreen } from './DropshippingWishlistScreen';
 import { DropshippingOrdersScreen } from './DropshippingOrdersScreen';
 import { DropshippingSupportScreen } from './DropshippingSupportScreen';
 import {
-  DropshippingAnalyticsScreen,
   DropshippingPaymentRequestScreen,
 } from './DropshippingWorkspaceScreens';
 import { DropshippingSellerDashboardScreen } from './DropshippingSellerDashboardScreen';
+import { DropshippingMyAnalyticsScreen } from './DropshippingMyAnalyticsScreen';
 
 const SECTIONS: Record<
   string,
@@ -141,7 +141,7 @@ function DropshippingSectionContent({ section }: { section?: string }) {
   }
   if (section === 'wishlist') return <DropshippingWishlistScreen />;
   if (section === 'order-list') return <DropshippingOrdersScreen />;
-  if (section === 'my-analytics') return <DropshippingAnalyticsScreen />;
+  if (section === 'my-analytics') return <DropshippingMyAnalyticsScreen />;
   if (section === 'seller-dashboard' || section === 'dashboard') {
     return <DropshippingSellerDashboardScreen />;
   }

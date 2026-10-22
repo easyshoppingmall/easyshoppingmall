@@ -7,6 +7,18 @@ export interface DropshippingAnalyticsTransaction {
   status: string;
   date: string;
   amount: number;
+  orderId?: string;
+  user?: string;
+}
+
+export interface DropshippingVideoReferral {
+  buyerName: string;
+  buyerEmail: string;
+  courseTitle: string;
+  createdAt: string;
+  amount: number;
+  bonusAmount: number;
+  status: string;
 }
 
 export interface DropshippingOrderPipeline {
@@ -14,10 +26,20 @@ export interface DropshippingOrderPipeline {
   processing?: number;
   shipped?: number;
   delivered?: number;
+  [status: string]: number | undefined;
+}
+
+export interface DropshippingAnalyticsTotals extends DropshippingWorkspaceRecord {
+  currentBalance?: number;
+  totalProfit?: number;
+  pendingProfit?: number;
+  referralIncome?: number;
 }
 
 export interface DropshippingAnalyticsSummary extends DropshippingWorkspaceRecord {
+  summary?: DropshippingAnalyticsTotals;
   transactions?: DropshippingAnalyticsTransaction[];
+  videoReferrals?: DropshippingVideoReferral[];
   orderPipeline?: DropshippingOrderPipeline;
 }
 
@@ -47,6 +69,38 @@ function parseAnalyticsTransaction(value: unknown): DropshippingAnalyticsTransac
     status: transaction.status,
     date: transaction.date,
     amount,
+    ...(typeof transaction.orderId === 'string' ? { orderId: transaction.orderId } : {}),
+    ...(typeof transaction.user === 'string' ? { user: transaction.user } : {}),
+  };
+}
+
+function parseVideoReferral(value: unknown): DropshippingVideoReferral {
+  const referral = record(value);
+  const amount = Number(referral?.amount);
+  const bonusAmount = Number(referral?.bonusAmount);
+  if (
+    typeof referral?.buyerName !== 'string' ||
+    typeof referral.buyerEmail !== 'string' ||
+    typeof referral.courseTitle !== 'string' ||
+    typeof referral.createdAt !== 'string' ||
+    typeof referral.status !== 'string' ||
+    (typeof referral.amount !== 'number' && typeof referral.amount !== 'string') ||
+    (typeof referral.bonusAmount !== 'number' && typeof referral.bonusAmount !== 'string') ||
+    (typeof referral.amount === 'string' && !referral.amount.trim()) ||
+    (typeof referral.bonusAmount === 'string' && !referral.bonusAmount.trim()) ||
+    !Number.isFinite(amount) ||
+    !Number.isFinite(bonusAmount)
+  ) {
+    throw new Error('সার্ভার থেকে ভিডিও রেফারেলের সঠিক তথ্য পাওয়া যায়নি।');
+  }
+  return {
+    buyerName: referral.buyerName,
+    buyerEmail: referral.buyerEmail,
+    courseTitle: referral.courseTitle,
+    createdAt: referral.createdAt,
+    amount,
+    bonusAmount,
+    status: referral.status,
   };
 }
 
@@ -55,17 +109,41 @@ function parseOrderPipeline(value: unknown): DropshippingOrderPipeline {
   if (!pipeline) {
     throw new Error('সার্ভার থেকে অর্ডার পাইপলাইনের সঠিক তথ্য পাওয়া যায়নি।');
   }
-  const stages = ['pending', 'processing', 'shipped', 'delivered'] as const;
-  return stages.reduce<DropshippingOrderPipeline>((result, stage) => {
-    const stageValue = pipeline[stage];
-    if (stageValue === undefined || stageValue === null) return result;
+  return Object.entries(pipeline).reduce<DropshippingOrderPipeline>((result, [stage, stageValue]) => {
     const count = Number(stageValue);
-    if (!Number.isFinite(count) || count < 0) {
+    if (
+      (typeof stageValue !== 'number' && typeof stageValue !== 'string') ||
+      (typeof stageValue === 'string' && !stageValue.trim()) ||
+      !Number.isFinite(count) ||
+      count < 0
+    ) {
       throw new Error('সার্ভার থেকে অর্ডার পাইপলাইনের সঠিক তথ্য পাওয়া যায়নি।');
     }
     result[stage] = count;
     return result;
   }, {});
+}
+
+function parseAnalyticsTotals(value: unknown): DropshippingAnalyticsTotals {
+  const totals = record(value);
+  if (!totals) {
+    throw new Error('সার্ভার থেকে অ্যানালিটিক্স সারসংক্ষেপের সঠিক তথ্য পাওয়া যায়নি।');
+  }
+  const keys = ['currentBalance', 'totalProfit', 'pendingProfit', 'referralIncome'] as const;
+  const parsed = { ...totals };
+  for (const key of keys) {
+    const metric = totals[key];
+    if (metric === undefined || metric === null) continue;
+    if (
+      (typeof metric !== 'number' && typeof metric !== 'string') ||
+      (typeof metric === 'string' && !metric.trim()) ||
+      !Number.isFinite(Number(metric))
+    ) {
+      throw new Error('সার্ভার থেকে অ্যানালিটিক্স সারসংক্ষেপের সঠিক তথ্য পাওয়া যায়নি।');
+    }
+    parsed[key] = Number(metric);
+  }
+  return parsed as DropshippingAnalyticsTotals;
 }
 
 function getErrorMessage(value: unknown, fallback: string): string {
@@ -86,9 +164,15 @@ function unwrapData(value: unknown): unknown {
 }
 
 export async function getDropshippingAnalytics(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  range?: { startDate?: string; endDate?: string }
 ): Promise<DropshippingAnalyticsSummary> {
-  const { data } = await apiClient.get('/api/analytics/dropshipping/my-summary', { signal });
+  const { data } = await apiClient.get('/api/analytics/dropshipping/my-summary', {
+    signal,
+    ...(range?.startDate || range?.endDate
+      ? { params: { startDate: range.startDate, endDate: range.endDate } }
+      : {}),
+  });
   const unwrapped = unwrapData(data);
   const summary = record(unwrapped);
   if (!summary) throw new Error('সার্ভার থেকে অ্যানালিটিক্সের সঠিক তথ্য পাওয়া যায়নি।');
@@ -99,12 +183,24 @@ export async function getDropshippingAnalytics(
       : (() => {
           throw new Error('সার্ভার থেকে ড্যাশবোর্ড লেনদেনের সঠিক তালিকা পাওয়া যায়নি।');
         })();
+  const totals = summary.summary === undefined || summary.summary === null
+    ? undefined
+    : parseAnalyticsTotals(summary.summary);
+  const videoReferrals = summary.videoReferrals === undefined || summary.videoReferrals === null
+    ? undefined
+    : Array.isArray(summary.videoReferrals)
+      ? summary.videoReferrals.map(parseVideoReferral)
+      : (() => {
+          throw new Error('সার্ভার থেকে ভিডিও রেফারেলের সঠিক তালিকা পাওয়া যায়নি।');
+        })();
   const orderPipeline = summary.orderPipeline === undefined || summary.orderPipeline === null
     ? undefined
     : parseOrderPipeline(summary.orderPipeline);
   return {
     ...summary,
+    ...(totals ? { summary: totals } : {}),
     ...(transactions ? { transactions } : {}),
+    ...(videoReferrals ? { videoReferrals } : {}),
     ...(orderPipeline ? { orderPipeline } : {}),
   };
 }

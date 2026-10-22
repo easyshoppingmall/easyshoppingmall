@@ -41,18 +41,29 @@ export const dropshippingHomeQueryKeys = {
   orders: (userId: string) => ['dropshipping', 'orders', userId] as const,
   orderDetails: (userId: string, orderId: string) =>
     ['dropshipping', 'order-details', userId, orderId] as const,
-  analytics: (userId: string) => ['dropshipping', 'analytics', userId] as const,
+  analytics: (userId: string, startDate?: string, endDate?: string) =>
+    startDate || endDate
+      ? ['dropshipping', 'analytics', userId, startDate ?? null, endDate ?? null] as const
+      : ['dropshipping', 'analytics', userId] as const,
   paymentRequests: (userId: string) =>
     ['dropshipping', 'payment-requests', userId] as const,
 };
 
-export function useDropshippingAnalyticsQuery() {
+export function useDropshippingAnalyticsQuery(range?: {
+  startDate?: string;
+  endDate?: string;
+}) {
   const userId = useAppSelector((state) => state.auth.user?._id);
   return useQuery({
-    queryKey: dropshippingHomeQueryKeys.analytics(userId ?? ''),
-    queryFn: ({ signal }) => getDropshippingAnalytics(signal),
+    queryKey: dropshippingHomeQueryKeys.analytics(
+      userId ?? '',
+      range?.startDate,
+      range?.endDate
+    ),
+    queryFn: ({ signal }) => getDropshippingAnalytics(signal, range),
     enabled: Boolean(userId),
     staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
   });
 }
 
