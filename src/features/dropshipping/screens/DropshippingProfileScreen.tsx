@@ -40,17 +40,6 @@ interface ProfileDraft {
   mobile: string;
   dateOfBirth: string;
   gender: Gender;
-  shopName: string;
-  shopAddress: string;
-  shopWebsite: string;
-  facebookPage: string;
-  whatsappNumber: string;
-  paymentDetails: {
-    bkash: string;
-    nagad: string;
-    rocket: string;
-    bank: string;
-  };
 }
 
 function profileDraftFrom(user?: UserProfile): ProfileDraft {
@@ -59,17 +48,6 @@ function profileDraftFrom(user?: UserProfile): ProfileDraft {
     mobile: String(user?.mobile ?? user?.phone ?? ''),
     dateOfBirth: String(user?.date_of_birth ?? '').slice(0, 10),
     gender: user?.gender ?? '',
-    shopName: user?.shopName ?? '',
-    shopAddress: user?.shopAddress ?? '',
-    shopWebsite: user?.shopWebsite ?? '',
-    facebookPage: user?.facebookPage ?? '',
-    whatsappNumber: user?.whatsappNumber ?? '',
-    paymentDetails: {
-      bkash: user?.paymentDetails?.bkash ?? '',
-      nagad: user?.paymentDetails?.nagad ?? '',
-      rocket: user?.paymentDetails?.rocket ?? '',
-      bank: user?.paymentDetails?.bank ?? '',
-    },
   };
 }
 
@@ -215,6 +193,12 @@ export function DropshippingProfileScreen() {
     mutationFn: (payload: UpdateOwnProfilePayload) => authApi.updateOwnProfile(payload),
     onSuccess: async (updatedUser) => {
       dispatch(updateCurrentUser(updatedUser));
+      queryClient.setQueryData(
+        dropshippingHomeQueryKeys.profileDashboard(userId),
+        (current: typeof profileDashboardQuery.data) =>
+          current ? { ...current, user: updatedUser } : current
+      );
+      queryClient.setQueryData(dropshippingHomeQueryKeys.profile(userId), updatedUser);
       setEditing(false);
       setNotice('প্রোফাইলের তথ্য সংরক্ষণ হয়েছে।');
       await Promise.all([
@@ -226,20 +210,19 @@ export function DropshippingProfileScreen() {
   });
 
   const imageMutation = useMutation({
-    mutationFn: async ({ uri, type }: { uri: string; type: 'profile' | 'shopLogo' }) => {
+    mutationFn: async (uri: string) => {
       const formData = new FormData() as FormData & {
         append(name: string, value: { uri: string; name: string; type: string }): void;
       };
       formData.append('image', {
         uri,
-        name: type === 'shopLogo' ? 'shop-logo.jpg' : 'profile-photo.jpg',
+        name: 'profile-photo.jpg',
         type: 'image/jpeg',
       });
-      await updateDropshippingUserImage(userId, formData, type === 'shopLogo' ? 'shopLogo' : undefined);
-      return type;
+      await updateDropshippingUserImage(userId, formData);
     },
-    onSuccess: async (type) => {
-      setNotice(type === 'shopLogo' ? 'শপের লোগো আপডেট হয়েছে।' : 'প্রোফাইল ছবি আপডেট হয়েছে।');
+    onSuccess: async () => {
+      setNotice('প্রোফাইল ছবি আপডেট হয়েছে।');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dropshippingHomeQueryKeys.profile(userId) }),
         queryClient.invalidateQueries({ queryKey: dropshippingHomeQueryKeys.profileDashboard(userId) }),
@@ -284,21 +267,10 @@ export function DropshippingProfileScreen() {
       mobile,
       date_of_birth: dateOfBirth || null,
       gender: draft.gender || null,
-      shopName: draft.shopName.trim(),
-      shopAddress: draft.shopAddress.trim(),
-      shopWebsite: draft.shopWebsite.trim(),
-      facebookPage: draft.facebookPage.trim(),
-      whatsappNumber: draft.whatsappNumber.trim(),
-      paymentDetails: {
-        bkash: draft.paymentDetails.bkash.trim(),
-        nagad: draft.paymentDetails.nagad.trim(),
-        rocket: draft.paymentDetails.rocket.trim(),
-        bank: draft.paymentDetails.bank.trim(),
-      },
     });
   };
 
-  const chooseImage = async (type: 'profile' | 'shopLogo') => {
+  const chooseImage = async () => {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
@@ -312,7 +284,7 @@ export function DropshippingProfileScreen() {
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0]) {
-        imageMutation.mutate({ uri: result.assets[0].uri, type });
+        imageMutation.mutate(result.assets[0].uri);
       }
     } catch (error) {
       setNotice(dropshippingProfileErrorMessage(error, 'ছবি নির্বাচন করা যায়নি।'));
@@ -401,7 +373,7 @@ export function DropshippingProfileScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="প্রোফাইল ছবি পরিবর্তন"
-              onPress={() => void chooseImage('profile')}
+              onPress={() => void chooseImage()}
               disabled={imageMutation.isPending}
               className="h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-white/15"
             >
@@ -410,7 +382,7 @@ export function DropshippingProfileScreen() {
               ) : (
                 <Ionicons name="person" size={35} color="#FFFFFF" />
               )}
-              {imageMutation.isPending && imageMutation.variables?.type === 'profile' ? (
+              {imageMutation.isPending ? (
                 <View className="absolute inset-0 items-center justify-center bg-black/40">
                   <ActivityIndicator color="#FFFFFF" />
                 </View>
@@ -446,8 +418,9 @@ export function DropshippingProfileScreen() {
             <View>
               <Text className="text-[9px] text-white/70">বর্তমান ব্যালেন্স</Text>
               <Text className="mt-1 text-[21px] font-black text-white">
-                {typeof profile?.balance === 'number' && Number.isFinite(profile.balance)
-                  ? formatDropshippingTaka(profile.balance)
+                {typeof profileDashboardQuery.data?.user.balance === 'number' &&
+                Number.isFinite(profileDashboardQuery.data.user.balance)
+                  ? formatDropshippingTaka(profileDashboardQuery.data.user.balance)
                   : '—'}
               </Text>
             </View>
@@ -529,7 +502,7 @@ export function DropshippingProfileScreen() {
                 <View className="mb-4 flex-row items-center">
                   <View className="flex-1">
                     <Text className="text-[14px] font-extrabold text-ink">প্রোফাইল সম্পাদনা</Text>
-                    <Text className="mt-1 text-[10px] text-muted">আপনার অ্যাকাউন্ট ও শপের তথ্য হালনাগাদ করুন</Text>
+                    <Text className="mt-1 text-[10px] text-muted">আপনার ব্যক্তিগত অ্যাকাউন্টের তথ্য হালনাগাদ করুন</Text>
                   </View>
                   <Pressable onPress={() => setEditing(false)} className="h-8 w-8 items-center justify-center rounded-full bg-bg">
                     <Ionicons name="close" size={18} color={colors.ink} />
@@ -557,35 +530,6 @@ export function DropshippingProfileScreen() {
                     </Pressable>
                   ))}
                 </View>
-                <View className="mb-3 border-t border-line pt-4">
-                  <Text className="text-[12px] font-extrabold text-ink">শপের তথ্য</Text>
-                </View>
-                <ProfileField label="শপের নাম" value={draft.shopName} onChangeText={(value) => updateDraft('shopName', value)} />
-                <ProfileField label="শপের ঠিকানা" value={draft.shopAddress} onChangeText={(value) => updateDraft('shopAddress', value)} />
-                <ProfileField label="ওয়েবসাইট" value={draft.shopWebsite} keyboardType="url" autoCapitalize="none" onChangeText={(value) => updateDraft('shopWebsite', value)} />
-                <ProfileField label="Facebook পেজ" value={draft.facebookPage} keyboardType="url" autoCapitalize="none" onChangeText={(value) => updateDraft('facebookPage', value)} />
-                <ProfileField label="WhatsApp নম্বর" value={draft.whatsappNumber} keyboardType="phone-pad" onChangeText={(value) => updateDraft('whatsappNumber', value)} />
-                <View className="mb-3 border-t border-line pt-4">
-                  <Text className="text-[12px] font-extrabold text-ink">পেমেন্ট গ্রহণের তথ্য</Text>
-                  <Text className="mt-1 text-[9px] text-muted">কমিশন/পেমেন্ট পাওয়ার জন্য আপনার তথ্য দিন</Text>
-                </View>
-                {([
-                  ['bkash', 'বিকাশ নম্বর'],
-                  ['nagad', 'নগদ নম্বর'],
-                  ['rocket', 'রকেট নম্বর'],
-                  ['bank', 'ব্যাংক তথ্য'],
-                ] as const).map(([key, label]) => (
-                  <ProfileField
-                    key={key}
-                    label={label}
-                    value={draft.paymentDetails[key]}
-                    keyboardType={key === 'bank' ? 'default' : 'phone-pad'}
-                    onChangeText={(value) => setDraft((current) => ({
-                      ...current,
-                      paymentDetails: { ...current.paymentDetails, [key]: value },
-                    }))}
-                  />
-                ))}
                 <View className="mt-1 flex-row">
                   <Pressable
                     onPress={() => setEditing(false)}
@@ -630,46 +574,6 @@ export function DropshippingProfileScreen() {
                   <InfoRow icon="calendar-number-outline" label="সদস্য হয়েছেন" value={dateLabel(profile?.createdAt)} last />
                 </View>
 
-                <SectionTitle title="ড্রপশিপিং শপ" />
-                <View className="rounded-2xl border border-line bg-white px-3">
-                  <InfoRow icon="storefront-outline" label="শপের নাম" value={displayText(profile?.shopName)} />
-                  <InfoRow icon="location-outline" label="শপের ঠিকানা" value={displayText(profile?.shopAddress)} />
-                  <InfoRow icon="globe-outline" label="ওয়েবসাইট" value={displayText(profile?.shopWebsite)} />
-                  <InfoRow icon="logo-facebook" label="Facebook পেজ" value={displayText(profile?.facebookPage)} />
-                  <InfoRow icon="logo-whatsapp" label="WhatsApp" value={displayText(profile?.whatsappNumber)} last />
-                  <View className="mb-3 mt-1 flex-row items-center rounded-xl bg-bg p-3">
-                    <View className="mr-3 h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary-light">
-                      {profile?.shopLogo ? (
-                        <Image source={{ uri: profile.shopLogo }} contentFit="cover" style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <Ionicons name="storefront-outline" size={21} color={colors.primary} />
-                      )}
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[10px] font-bold text-ink">শপের লোগো</Text>
-                      <Text className="mt-1 text-[9px] text-muted">
-                        {profile?.shopLogo ? 'লোগো আপলোড করা আছে' : 'এখনো লোগো যোগ করা হয়নি'}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => void chooseImage('shopLogo')}
-                      disabled={imageMutation.isPending}
-                      className="rounded-lg bg-white px-3 py-2"
-                    >
-                      {imageMutation.isPending && imageMutation.variables?.type === 'shopLogo'
-                        ? <ActivityIndicator size="small" color={colors.primary} />
-                        : <Text className="text-[9px] font-bold text-primary">পরিবর্তন</Text>}
-                    </Pressable>
-                  </View>
-                </View>
-
-                <SectionTitle title="পেমেন্ট গ্রহণের তথ্য" />
-                <View className="rounded-2xl border border-line bg-white px-3">
-                  <InfoRow icon="wallet-outline" label="বিকাশ" value={displayText(profile?.paymentDetails?.bkash)} />
-                  <InfoRow icon="wallet-outline" label="নগদ" value={displayText(profile?.paymentDetails?.nagad)} />
-                  <InfoRow icon="wallet-outline" label="রকেট" value={displayText(profile?.paymentDetails?.rocket)} />
-                  <InfoRow icon="business-outline" label="ব্যাংক" value={displayText(profile?.paymentDetails?.bank)} last />
-                </View>
               </>
             )}
 

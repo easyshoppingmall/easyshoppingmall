@@ -178,6 +178,12 @@ export function formatDropshippingNumber(amount: number): string {
   return formatted;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
 function unwrapList<T>(response: ApiEnvelope<T[]>): T[] {
   if (response.success === false) {
     throw new Error(response.message || 'সার্ভার থেকে তথ্য আনা যায়নি।');
@@ -279,19 +285,34 @@ export async function getDropshippingSubcategories(
 export async function getDropshippingProfile(
   signal?: AbortSignal
 ): Promise<DropshippingProfile> {
-  const { data } = await apiClient.get<{
-    success?: boolean;
-    message?: string;
-    user?: DropshippingProfile;
-  }>('/api/users/userprofile', { signal });
-
-  if (data.success === false) {
-    throw new Error(data.message || 'অ্যাকাউন্টের তথ্য আনা যায়নি।');
+  const { data } = await apiClient.get<unknown>('/api/users/userprofile', { signal });
+  const response = asRecord(data);
+  const body = asRecord(response?.data) ?? response;
+  if (response?.success === false || body?.success === false) {
+    const message = body?.message ?? response?.message;
+    throw new Error(typeof message === 'string' && message.trim() ? message : 'অ্যাকাউন্টের তথ্য আনা যায়নি।');
   }
-  if (!data.user?._id) {
+  const nested = asRecord(body?.data);
+  const profile = asRecord(
+    body?.user ??
+      body?.profile ??
+      nested?.user ??
+      nested?.profile ??
+      (body?._id ? body : undefined)
+  );
+  if (typeof profile?._id !== 'string' || !profile._id) {
     throw new Error('সার্ভার থেকে অ্যাকাউন্টের সঠিক তথ্য পাওয়া যায়নি।');
   }
-  return data.user;
+  const balance =
+    typeof profile.balance === 'number'
+      ? profile.balance
+      : typeof profile.balance === 'string' && profile.balance.trim()
+        ? Number(profile.balance)
+        : undefined;
+  return {
+    ...profile,
+    balance: balance !== undefined && Number.isFinite(balance) ? balance : undefined,
+  } as DropshippingProfile;
 }
 
 export async function getDropshippingBanners(

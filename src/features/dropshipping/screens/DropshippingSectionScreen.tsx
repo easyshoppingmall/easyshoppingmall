@@ -9,8 +9,10 @@ import { formatDropshippingTaka } from '../api/homeApi';
 import { DropshippingSearchScreen } from './DropshippingSearchScreen';
 import { DropshippingAllProductsScreen } from './DropshippingAllProductsScreen';
 import { DropshippingProfileScreen } from './DropshippingProfileScreen';
+import { DropshippingShopSettingsScreen } from './DropshippingShopSettingsScreen';
 import { DropshippingWishlistScreen } from './DropshippingWishlistScreen';
 import { DropshippingOrdersScreen } from './DropshippingOrdersScreen';
+import { DropshippingSupportScreen } from './DropshippingSupportScreen';
 import {
   DropshippingAnalyticsScreen,
   DropshippingDashboardScreen,
@@ -119,15 +121,22 @@ const SECTIONS: Record<
 };
 
 export function DropshippingSectionScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ section?: string | string[] }>();
   const section = Array.isArray(params.section) ? params.section[0] : params.section;
+
+  if (section === 'support') return <DropshippingSupportScreen />;
+  return <DropshippingSectionContent section={section} />;
+}
+
+function DropshippingSectionContent({ section }: { section?: string }) {
+  const router = useRouter();
   const details = section ? SECTIONS[section] : undefined;
   const profileQuery = useDropshippingProfileQuery();
   const profile = profileQuery.data;
 
   if (section === 'search-products') return <DropshippingSearchScreen />;
-  if (section === 'account' || section === 'referral-profile' || section === 'shop-settings') {
+  if (section === 'shop-settings') return <DropshippingShopSettingsScreen />;
+  if (section === 'account' || section === 'referral-profile') {
     return <DropshippingProfileScreen />;
   }
   if (section === 'wishlist') return <DropshippingWishlistScreen />;

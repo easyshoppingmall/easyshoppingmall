@@ -24,6 +24,10 @@ function errorMessage(value: unknown, fallback: string): string {
   const response = asRecord(root?.response);
   const data = asRecord(response?.data);
   const message = data?.message ?? root?.message;
+  const status = response?.status;
+  if (status === 404) {
+    return 'প্রোফাইল API route পাওয়া যায়নি (404)। API base URL এবং backend route configuration যাচাই করুন।';
+  }
   return typeof message === 'string' && message.trim()
     ? message
     : value instanceof Error && value.message

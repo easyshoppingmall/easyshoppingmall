@@ -1,18 +1,32 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppSelector } from '../../../store/hooks';
 import { colors } from '../../../shared/theme/colors';
 import { formatDropshippingNumber, formatDropshippingTaka } from '../api/homeApi';
 import type { DropshippingWorkspaceRecord } from '../api/workspaceApi';
 import {
+  dropshippingHomeQueryKeys,
   useDropshippingAnalyticsQuery,
   useDropshippingOrdersQuery,
   useDropshippingPaymentRequestsQuery,
   useDropshippingProfileQuery,
 } from '../api/queries';
+import { createDropshippingPaymentRequest } from '../api/workspaceApi';
 
 function text(value: unknown): string {
   if (typeof value === 'string' && value.trim()) return value.trim();
@@ -47,6 +61,34 @@ function statusLabel(value: unknown): string {
     failed: 'ব্যর্থ',
   };
   return labels[status] ?? (text(value) || 'অবস্থা নেই');
+}
+
+function paymentRequestStatusStyle(value: unknown): { color: string; background: string } {
+  const status = text(value).toLowerCase().replace(/[\s-]+/g, '_');
+  if (['approved', 'paid', 'completed', 'success'].includes(status)) {
+    return { color: '#087443', background: '#EAF7EE' };
+  }
+  if (['rejected', 'cancelled', 'failed'].includes(status)) {
+    return { color: '#B42318', background: '#FDECEF' };
+  }
+  if (['processing', 'in_progress'].includes(status)) {
+    return { color: '#175CD3', background: '#E5F4FD' };
+  }
+  return { color: '#B54708', background: '#FFF1E0' };
+}
+
+const PAYMENT_METHODS = [
+  { key: 'bkash', label: 'বিকাশ', icon: 'phone-portrait-outline' as const },
+  { key: 'nagad', label: 'নগদ', icon: 'phone-portrait-outline' as const },
+  { key: 'rocket', label: 'রকেট', icon: 'phone-portrait-outline' as const },
+  { key: 'bank', label: 'ব্যাংক', icon: 'business-outline' as const },
+] as const;
+
+function maskedAccount(value: string): string {
+  const normalized = value.replace(/\s/g, '');
+  return normalized.length <= 4
+    ? normalized
+    : `${'•'.repeat(Math.min(8, normalized.length - 4))}${normalized.slice(-4)}`;
 }
 
 const ANALYTICS_FIELDS: {
@@ -417,8 +459,15 @@ function paymentRequestStatus(request: DropshippingWorkspaceRecord): string {
 function PaymentRequestCard({ request }: { request: DropshippingWorkspaceRecord }) {
   const id = text(request._id ?? request.id ?? request.requestId);
   const amountValue = number(request.amount ?? request.requestedAmount ?? request.paymentAmount);
-  const method = text(request.method ?? request.paymentMethod ?? request.provider);
+  const methodValue = text(request.method ?? request.paymentMethod ?? request.payment_method ?? request.provider);
+  const method = PAYMENT_METHODS.find((item) => item.key === methodValue.toLowerCase())?.label ?? methodValue;
+  const account = text(request.accountNumber ?? request.account_number ?? request.account ?? request.number);
   const date = dateLabel(request.createdAt ?? request.created_at ?? request.requestedAt);
+  const transactionId = text(request.transactionId ?? request.transaction_id ?? request.trxId);
+  const receipt = text(request.receiptUrl ?? request.receipt_url ?? request.receipt);
+  const note = text(request.adminNote ?? request.admin_note ?? request.rejectionReason ?? request.rejection_reason ?? request.note ?? request.message);
+  const status = request.status ?? request.request_status ?? request.payment_status;
+  const badge = paymentRequestStatusStyle(status);
   return (
     <View className="mb-2 rounded-2xl border border-line bg-white p-3.5">
       <View className="flex-row items-center">
@@ -431,31 +480,117 @@ function PaymentRequestCard({ request }: { request: DropshippingWorkspaceRecord 
           </Text>
           {id ? <Text className="mt-1 text-[8px] text-muted">রেফারেন্স: {id}</Text> : null}
         </View>
-        <View className="rounded-full bg-primary-light px-2.5 py-1">
-          <Text className="text-[8px] font-bold text-primary">{paymentRequestStatus(request)}</Text>
+        <View style={{ backgroundColor: badge.background }} className="rounded-full px-2.5 py-1">
+          <Text style={{ color: badge.color }} className="text-[8px] font-bold">{paymentRequestStatus(request)}</Text>
         </View>
       </View>
-      {(method || date) ? (
-        <View className="mt-3 flex-row justify-between border-t border-line pt-2.5">
-          {method ? <Text className="text-[9px] text-muted">{method}</Text> : <View />}
-          {date ? <Text className="text-[9px] text-muted">{date}</Text> : null}
-        </View>
-      ) : null}
-      {text(request.note ?? request.message) ? (
-        <Text className="mt-2 text-[9px] leading-4 text-muted">{text(request.note ?? request.message)}</Text>
-      ) : null}
+      <View className="mt-3 border-t border-line pt-2.5">
+        {method ? <DetailInfo label="পেমেন্ট মাধ্যম" value={method} /> : null}
+        {account ? <DetailInfo label="অ্যাকাউন্ট" value={maskedAccount(account)} /> : null}
+        {date ? <DetailInfo label="আবেদনের তারিখ" value={date} /> : null}
+        {transactionId ? <DetailInfo label="ট্রানজেকশন আইডি" value={transactionId} /> : null}
+        {note ? (
+          <View className="mt-2 rounded-lg bg-bg px-3 py-2">
+            <Text className="text-[8px] font-bold text-muted">অ্যাডমিন নোট</Text>
+            <Text className="mt-1 text-[9px] leading-4 text-ink">{note}</Text>
+          </View>
+        ) : null}
+        {receipt ? (
+          <Pressable
+            onPress={() => {
+              void Linking.openURL(receipt).catch(() => {
+                Alert.alert('রসিদ খোলা যায়নি', 'রসিদের লিংকটি এখন খোলা সম্ভব হচ্ছে না।');
+              });
+            }}
+            className="mt-2 flex-row items-center self-start rounded-lg bg-primary-light px-3 py-2"
+          >
+            <Ionicons name="receipt-outline" size={14} color={colors.primary} />
+            <Text className="ml-1.5 text-[9px] font-bold text-primary">রসিদ দেখুন</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function DetailInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="mb-2 flex-row justify-between">
+      <Text className="text-[9px] text-muted">{label}</Text>
+      <Text className="ml-3 flex-1 text-right text-[9px] font-semibold text-ink">{value}</Text>
     </View>
   );
 }
 
 export function DropshippingPaymentRequestScreen() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const profileQuery = useDropshippingProfileQuery();
   const requestQuery = useDropshippingPaymentRequestsQuery();
   const requests = requestQuery.data ?? [];
   const balance = number(profileQuery.data?.balance);
+  const methods = useMemo(
+    () => PAYMENT_METHODS.filter((method) => text(profileQuery.data?.paymentDetails?.[method.key])),
+    [profileQuery.data?.paymentDetails]
+  );
+  const [selectedMethod, setSelectedMethod] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountNumberEdited, setAccountNumberEdited] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [validationError, setValidationError] = useState('');
+  const activeMethod = methods.find((method) => method.key === selectedMethod) ?? methods[0];
+  const savedAccount = activeMethod
+    ? text(profileQuery.data?.paymentDetails?.[activeMethod.key])
+    : '';
+  const destinationAccount = accountNumberEdited ? accountNumber : savedAccount;
+  const withdrawalMutation = useMutation({
+    mutationFn: createDropshippingPaymentRequest,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: dropshippingHomeQueryKeys.paymentRequests(userId ?? ''),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: dropshippingHomeQueryKeys.profile(userId ?? ''),
+        }),
+      ]);
+      setAmount('');
+      setValidationError('');
+    },
+  });
   const refreshing = profileQuery.isRefetching || requestQuery.isRefetching;
   const refresh = () => {
     void Promise.all([profileQuery.refetch(), requestQuery.refetch()]);
+  };
+  const submitRequest = () => {
+    setValidationError('');
+    const parsedAmount = Number(amount.replace(/,/g, '').trim());
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setValidationError('সঠিক উত্তোলনের পরিমাণ লিখুন।');
+      return;
+    }
+    if (balance === undefined) {
+      setValidationError('ব্যালেন্স যাচাই করা যাচ্ছে না। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      return;
+    }
+    if (parsedAmount > balance) {
+      setValidationError('উত্তোলনের পরিমাণ আপনার উপলভ্য ব্যালেন্সের বেশি হতে পারবে না।');
+      return;
+    }
+    if (!activeMethod) {
+      setValidationError('প্রথমে প্রোফাইলে একটি পেমেন্ট গ্রহণের মাধ্যম যোগ করুন।');
+      return;
+    }
+    if (!destinationAccount.trim()) {
+      setValidationError('যে অ্যাকাউন্টে টাকা নিতে চান তার নম্বর লিখুন।');
+      return;
+    }
+    withdrawalMutation.mutate({
+      amount: parsedAmount,
+      paymentMethod: activeMethod.key,
+      accountNumber: destinationAccount.trim(),
+    });
   };
 
   return (
@@ -484,6 +619,139 @@ export function DropshippingPaymentRequestScreen() {
             </Text>
           </View>
         )}
+        <View className="mb-4 rounded-2xl border border-line bg-white p-4">
+          <View className="mb-3 flex-row items-center">
+            <View className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl bg-primary-light">
+              <Ionicons name="cash-outline" size={18} color={colors.primary} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-[12px] font-extrabold text-ink">টাকা উত্তোলনের অনুরোধ</Text>
+              <Text className="mt-0.5 text-[9px] text-muted">আপনার ড্রপশিপিং ব্যালেন্স থেকে অনুরোধ করুন</Text>
+            </View>
+          </View>
+          {profileQuery.isPending ? (
+            <LoadingState label="ব্যালেন্স ও পেমেন্ট মাধ্যম লোড হচ্ছে..." />
+          ) : (
+            <>
+              <Text className="mb-2 text-[9px] font-bold text-ink">টাকা গ্রহণের মাধ্যম</Text>
+              {methods.length ? (
+                <View className="mb-3 flex-row flex-wrap">
+                  {methods.map((method) => {
+                    const isSelected = (activeMethod?.key ?? '') === method.key;
+                    return (
+                      <Pressable
+                        key={method.key}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
+                        onPress={() => {
+                          setSelectedMethod(method.key);
+                          setAccountNumber('');
+                          setAccountNumberEdited(false);
+                        }}
+                        className={`mb-2 mr-2 flex-row items-center rounded-xl border px-3 py-2 ${
+                          isSelected ? 'border-primary bg-primary-light' : 'border-line bg-white'
+                        }`}
+                      >
+                        <Ionicons name={method.icon} size={15} color={isSelected ? colors.primary : colors.muted} />
+                        <Text className={`ml-1.5 text-[9px] font-bold ${isSelected ? 'text-primary' : 'text-muted'}`}>
+                          {method.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View className="mb-3 rounded-xl bg-tint-orange px-3 py-2.5">
+                  <Text className="text-[9px] leading-4 text-[#8A4B08]">
+                    আপনার প্রোফাইলে কোনো পেমেন্ট গ্রহণের মাধ্যম নেই। অনুরোধ করার আগে প্রোফাইল থেকে বিকাশ, নগদ, রকেট বা ব্যাংক তথ্য যোগ করুন।
+                  </Text>
+                  <Pressable
+                    onPress={() => router.push({ pathname: '/(dropshipping)/[section]', params: { section: 'shop-settings' } })}
+                    className="mt-2 self-start rounded-lg bg-white px-3 py-2"
+                  >
+                    <Text className="text-[8px] font-bold text-primary">পেমেন্ট মাধ্যম সেট করুন</Text>
+                  </Pressable>
+                </View>
+              )}
+              <Text className="mb-1.5 text-[9px] font-bold text-ink">অ্যাকাউন্ট নম্বর</Text>
+              <TextInput
+                value={destinationAccount}
+                onChangeText={(value) => {
+                  setAccountNumber(value);
+                  setAccountNumberEdited(true);
+                }}
+                editable={Boolean(activeMethod) && !withdrawalMutation.isPending}
+                keyboardType="phone-pad"
+                placeholder="টাকা গ্রহণের অ্যাকাউন্ট নম্বর"
+                placeholderTextColor={colors.muted}
+                className="mb-3 rounded-xl border border-line bg-bg px-3.5 py-3 text-[11px] text-ink"
+              />
+              <Text className="mb-1.5 text-[9px] font-bold text-ink">উত্তোলনের পরিমাণ</Text>
+              <View className="mb-2 flex-row items-center rounded-xl border border-line bg-bg px-3.5">
+                <Text className="mr-2 text-[12px] font-bold text-muted">৳</Text>
+                <TextInput
+                  value={amount}
+                  onChangeText={setAmount}
+                  editable={balance !== undefined && Boolean(activeMethod) && !withdrawalMutation.isPending}
+                  keyboardType="decimal-pad"
+                  placeholder="যত টাকা তুলতে চান"
+                  placeholderTextColor={colors.muted}
+                  className="flex-1 py-3 text-[11px] text-ink"
+                />
+                <Pressable
+                  onPress={() => setAmount(balance === undefined ? '' : String(balance))}
+                  disabled={balance === undefined || !activeMethod || withdrawalMutation.isPending}
+                  className="rounded-lg bg-primary-light px-2.5 py-1.5"
+                >
+                  <Text className="text-[8px] font-bold text-primary">সম্পূর্ণ</Text>
+                </Pressable>
+              </View>
+              <View className="mb-3 flex-row items-center justify-between">
+                <Text className="text-[9px] text-muted">উপলভ্য ব্যালেন্স</Text>
+                <Text className="text-[9px] font-bold text-primary">
+                  {balance === undefined ? '—' : formatDropshippingTaka(balance)}
+                </Text>
+              </View>
+              {validationError ? (
+                <Text accessibilityRole="alert" className="mb-2 text-[9px] leading-4 text-[#B42318]">
+                  {validationError}
+                </Text>
+              ) : null}
+              {withdrawalMutation.isError ? (
+                <Text accessibilityRole="alert" className="mb-2 text-[9px] leading-4 text-[#B42318]">
+                  {withdrawalMutation.error instanceof Error
+                    ? withdrawalMutation.error.message
+                    : 'অনুরোধ জমা দেওয়া যায়নি। আবার চেষ্টা করুন।'}
+                </Text>
+              ) : null}
+              {withdrawalMutation.isSuccess ? (
+                <View className="mb-3 rounded-xl bg-tint-green px-3 py-2.5">
+                  <Text className="text-[9px] leading-4 text-[#087443]">
+                    {text(withdrawalMutation.data.message) || 'অনুরোধ জমা হয়েছে। অনুমোদন বা পেমেন্টের অবস্থা সার্ভার নিশ্চিত করলে এখানে আপডেট হবে।'}
+                  </Text>
+                </View>
+              ) : null}
+              <Pressable
+                onPress={submitRequest}
+                disabled={!activeMethod || balance === undefined || withdrawalMutation.isPending}
+                className={`min-h-11 flex-row items-center justify-center rounded-xl ${
+                  !activeMethod || balance === undefined || withdrawalMutation.isPending
+                    ? 'bg-primary/50'
+                    : 'bg-primary'
+                }`}
+              >
+                {withdrawalMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane-outline" size={15} color="#FFFFFF" />
+                    <Text className="ml-2 text-[10px] font-extrabold text-white">অনুরোধ জমা দিন</Text>
+                  </>
+                )}
+              </Pressable>
+            </>
+          )}
+        </View>
         <View className="mb-3 flex-row items-center">
           <Text className="flex-1 text-[12px] font-extrabold text-ink">অনুরোধের ইতিহাস</Text>
           <Pressable onPress={refresh} className="h-9 w-9 items-center justify-center rounded-xl bg-white">

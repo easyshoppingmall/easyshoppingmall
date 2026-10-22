@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { apiClient } from './client';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,20 @@ export interface UpdateOwnProfilePayload {
   facebookPage?: string;
   whatsappNumber?: string;
   paymentDetails?: {
+    bkash: string;
+    nagad: string;
+    rocket: string;
+    bank: string;
+  };
+}
+
+export interface UpdateDropshippingShopSettingsPayload {
+  shopName: string;
+  shopAddress: string;
+  shopWebsite: string;
+  facebookPage: string;
+  whatsappNumber: string;
+  paymentDetails: {
     bkash: string;
     nagad: string;
     rocket: string;
@@ -190,12 +205,80 @@ function normalizeUser(value: unknown): UserProfile | undefined {
   if (!user) return undefined;
 
   const role = typeof user.role === 'string' ? user.role.toUpperCase() : user.role;
+  const balance =
+    typeof user.balance === 'number'
+      ? user.balance
+      : typeof user.balance === 'string' && user.balance.trim()
+        ? Number(user.balance)
+        : undefined;
   return {
     ...user,
     phone: user.phone ?? user.mobile ?? '',
     isVerified: user.isVerified ?? user.verify_email,
+    balance: balance !== undefined && Number.isFinite(balance) ? balance : undefined,
     role,
   } as UserProfile;
+}
+
+function responseBody(value: unknown): Record<string, unknown> {
+  const response = asRecord(value) ?? {};
+  return asRecord(response.data) ?? response;
+}
+
+function responseProfile(value: unknown): UserProfile | undefined {
+  const response = asRecord(value);
+  const body = responseBody(value);
+  const nestedData = asRecord(body.data);
+  return normalizeUser(
+    body.user ??
+      body.profile ??
+      body.updatedUser ??
+      nestedData?.user ??
+      nestedData?.profile ??
+      (body._id ? body : undefined) ??
+      (response?._id ? response : undefined)
+  );
+}
+
+function throwIfApiFailure(value: unknown, fallback: string): void {
+  const response = asRecord(value);
+  const body = responseBody(value);
+  if (response?.success === false || body.success === false) {
+    const message = body.message ?? body.error ?? response?.message;
+    throw new Error(typeof message === 'string' && message.trim() ? message : fallback);
+  }
+}
+
+function isProfileUpdateRouteNotFound(error: unknown): boolean {
+  if (!isAxiosError(error) || error.response?.status !== 404) return false;
+  const response = asRecord(error.response.data);
+  const responseText = typeof error.response.data === 'string' ? error.response.data : '';
+  const serverMessage =
+    typeof response?.message === 'string' ? response.message : responseText;
+  return !serverMessage || /cannot\s+(put|patch)\s+\/api\/users\/userprofile/i.test(serverMessage);
+}
+
+function profileUpdateRouteError(): Error {
+  return new Error(
+    'প্রোফাইল/শপ আপডেট করা যায়নি: সার্ভারে PUT /api/users/userprofile route পাওয়া যায়নি (404)। Backend-এ এই route deploy/enable করতে হবে।'
+  );
+}
+
+async function putProfileFields(
+  payload: UpdateOwnProfilePayload | UpdateDropshippingShopSettingsPayload
+): Promise<UserProfile> {
+  let data: unknown;
+  try {
+    const response = await apiClient.put(`${BASE}/userprofile`, payload);
+    data = response.data;
+  } catch (error) {
+    if (isProfileUpdateRouteNotFound(error)) throw profileUpdateRouteError();
+    throw error;
+  }
+
+  throwIfApiFailure(data, 'প্রোফাইলের তথ্য সংরক্ষণ করা যায়নি।');
+  const updatedProfile = responseProfile(data);
+  return updatedProfile ?? authApi.getProfile();
 }
 
 function normalizeAuthResponse(value: unknown, authorizationHeader?: unknown): AuthResponse {
@@ -279,24 +362,24 @@ export const authApi = {
   /** Get the current logged-in user's profile */
   getProfile: async (): Promise<UserProfile> => {
     const { data } = await apiClient.get(`${BASE}/userprofile`);
-    const profile = data?.user ?? data?.data?.user ?? data?.data ?? data;
-
-    if (typeof profile?.role === 'string') {
-      profile.role = profile.role.toUpperCase();
-    }
-
+    throwIfApiFailure(data, 'প্রোফাইল তথ্য আনা যায়নি।');
+    const profile = responseProfile(data);
+    if (!profile) throw new Error('প্রোফাইল তথ্য পাওয়া যায়নি।');
     return profile;
   },
 
   /** Get the authenticated user's profile and backend-provided referral history. */
   getProfileDashboard: async (signal?: AbortSignal): Promise<ProfileDashboard> => {
     const { data } = await apiClient.get(`${BASE}/userprofile`, { signal });
-    const response = asRecord(data) ?? {};
-    const body = asRecord(response.data) ?? response;
-    const profile = normalizeUser(body.user ?? asRecord(body.data)?.user);
+    throwIfApiFailure(data, 'প্রোফাইল তথ্য আনা যায়নি।');
+    const body = responseBody(data);
+    const profile = responseProfile(data);
     if (!profile) throw new Error('প্রোফাইল তথ্য পাওয়া যায়নি।');
 
-    const referralData = asRecord(body.referrals) ?? {};
+    const referralData =
+      asRecord(body.referrals) ??
+      asRecord(asRecord(body.data)?.referrals) ??
+      {};
     return {
       user: profile,
       referrals: {
@@ -309,12 +392,14 @@ export const authApi = {
 
   /** Update only fields belonging to the authenticated user's own profile. */
   updateOwnProfile: async (payload: UpdateOwnProfilePayload): Promise<UserProfile> => {
-    const { data } = await apiClient.put(`${BASE}/userprofile`, payload);
-    const response = asRecord(data) ?? {};
-    const body = asRecord(response.data) ?? response;
-    const user = normalizeUser(body.user ?? body.profile);
-    if (!user) throw new Error('আপডেট করা প্রোফাইল পাওয়া যায়নি।');
-    return user;
+    return putProfileFields(payload);
+  },
+
+  /** Save only Dropshipping shop/payment fields, separately from personal profile edits. */
+  updateDropshippingShopSettings: async (
+    payload: UpdateDropshippingShopSettingsPayload
+  ): Promise<UserProfile> => {
+    return putProfileFields(payload);
   },
 
   requestEmailChange: async (email: string): Promise<AuthResponse> => {

@@ -138,7 +138,7 @@ export function DropshippingIndexScreen() {
     ]).start();
   }, [backdropOpacity, drawerPosition, drawerVisible, drawerWidth]);
 
-  const balance = profileQuery.data?.balance ?? user?.balance;
+  const balance = profileQuery.data?.balance;
   const balanceLabel =
     typeof balance === 'number' && Number.isFinite(balance)
       ? formatDropshippingTaka(balance)

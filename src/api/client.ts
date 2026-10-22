@@ -5,10 +5,16 @@ import { create, type AxiosInstance, type InternalAxiosRequestConfig } from 'axi
  * Base URL is read dynamically from Expo public environment variable,
  * falling back to a safe placeholder endpoint.
  */
-const API_BASE_URL: string =
+const configuredApiBaseUrl: string =
   process.env.EXPO_PUBLIC_API_URL ||
   process.env.EXPO_PUBLIC_API_BASE_URL ||
   'https://api.easyshoppingmallbd.com';
+
+function normalizeApiBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(configuredApiBaseUrl);
 
 const defaultHeaders: Record<string, string> = {
   'Content-Type': 'application/json',

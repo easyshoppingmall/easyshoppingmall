@@ -26,6 +26,10 @@
 
 Password change body হলো `{ "currentPassword": "...", "newPassword": "..." }`; নতুন পাসওয়ার্ড ৮–১২৮ অক্ষরের হতে হবে। সফল পরিবর্তনে response-এ replacement `token` ফেরত আসে; অন্য session-গুলো invalid হয়ে যায়, তাই app-কে নতুন token সংরক্ষণ করতে হবে।
 
+Dropshipping app-এ ব্যক্তিগত Profile save এবং Shop Settings save আলাদা request হিসেবে পাঠানো হয়। Shop Settings request-এ শুধু shop/payment field পাঠানো হয়; তবে বর্তমান API contract-এ এর জন্য আলাদা URL নেই—এটি একই `PUT /api/users/userprofile` endpoint ব্যবহার করে। আলাদা backend endpoint যোগ না হওয়া পর্যন্ত অন্য route অনুমান করে ব্যবহার করা যাবে না।
+
+Deployment verification (2026-10-21): `GET /api/users/userprofile` unauthenticated request-এ `401 Unauthorized` ফেরায় এবং `PUT /api/users/user-image/test` একইভাবে `401 Unauthorized` ফেরায়; route-গুলো registered। কিন্তু unauthenticated `PUT /api/users/userprofile` `404 Cannot PUT /api/users/userprofile` এবং `PATCH` `404 Cannot PATCH /api/users/userprofile` ফেরায়। ফলে deployed backend-এ profile/shop update route বর্তমানে অনুপস্থিত, যদিও উপরের documented contract-এ PUT উল্লেখ আছে। Backend route deploy না হওয়া পর্যন্ত app থেকে profile বা shop fields সফলভাবে update করা সম্ভব নয়।
+
 ## Products
 
 | Method | Full URL | কাজ |

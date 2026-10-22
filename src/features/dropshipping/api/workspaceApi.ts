@@ -56,3 +56,24 @@ export async function getDropshippingPaymentRequests(
     return paymentRequest ? [paymentRequest] : [];
   });
 }
+
+export interface CreateDropshippingPaymentRequestPayload {
+  amount: number;
+  paymentMethod: string;
+  accountNumber: string;
+}
+
+export async function createDropshippingPaymentRequest(
+  payload: CreateDropshippingPaymentRequestPayload
+): Promise<DropshippingWorkspaceRecord> {
+  try {
+    const { data } = await apiClient.post('/api/payment-request/create', payload);
+    const root = record(data);
+    if (root?.success === false) {
+      throw new Error(getErrorMessage(data, 'পেমেন্ট অনুরোধ জমা দেওয়া যায়নি।'));
+    }
+    return record(root?.data) ?? record(root?.request) ?? root ?? {};
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'পেমেন্ট অনুরোধ জমা দেওয়া যায়নি।'));
+  }
+}
