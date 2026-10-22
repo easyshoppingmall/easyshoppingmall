@@ -15,9 +15,9 @@ import { DropshippingOrdersScreen } from './DropshippingOrdersScreen';
 import { DropshippingSupportScreen } from './DropshippingSupportScreen';
 import {
   DropshippingAnalyticsScreen,
-  DropshippingDashboardScreen,
   DropshippingPaymentRequestScreen,
 } from './DropshippingWorkspaceScreens';
+import { DropshippingSellerDashboardScreen } from './DropshippingSellerDashboardScreen';
 
 const SECTIONS: Record<
   string,
@@ -143,7 +143,7 @@ function DropshippingSectionContent({ section }: { section?: string }) {
   if (section === 'order-list') return <DropshippingOrdersScreen />;
   if (section === 'my-analytics') return <DropshippingAnalyticsScreen />;
   if (section === 'seller-dashboard' || section === 'dashboard') {
-    return <DropshippingDashboardScreen />;
+    return <DropshippingSellerDashboardScreen />;
   }
   if (section === 'payment-request') return <DropshippingPaymentRequestScreen />;
   if (section === 'all-products' || section === 'new-products') {

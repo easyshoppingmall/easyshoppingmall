@@ -266,6 +266,8 @@ After creating the order, call `POST /api/orders/manual-payment` separately with
 |---|---|---|
 | GET | `https://api.easyshoppingmallbd.com/api/analytics/dropshipping/my-summary` | Login করা dropshipper-এর নিজের summary দেখা |
 
+Seller Dashboard-এর ব্যবহৃত response shape: `data.transactions` একটি `type`, `status`, `date`, `amount`-যুক্ত লেনদেনের তালিকা; `data.orderPipeline`-এ `pending`, `processing`, `shipped`, `delivered` order count থাকে। Frontend Monthly Profit ও Revenue Trend লেনদেন থেকে হিসাব করে। সাম্প্রতিক অর্ডার, অর্ডার status এবং Top Products-এর জন্য authenticated `GET /api/orders/my-orders` response ব্যবহার করা হয়।
+
 ## Dropshipping Orders
 
 | Method | Full URL | কাজ |
