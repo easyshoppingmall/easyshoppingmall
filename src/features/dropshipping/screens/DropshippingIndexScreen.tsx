@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { signOut } from '../../../store/authSlice';
 import { colors } from '../../../shared/theme/colors';
@@ -44,23 +45,44 @@ interface DrawerItem {
   label: string;
   destination: DrawerDestination;
   section?: string;
+  icon: keyof typeof Ionicons.glyphMap;
 }
 
+interface OverviewItem {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  section: string;
+  tint: string;
+  iconColor: string;
+}
+
+const OVERVIEW_ITEMS: OverviewItem[] = [
+  { title: 'All Products', icon: 'grid-outline', section: 'all-products', tint: '#E5F4FD', iconColor: '#0092EE' },
+  { title: 'New Products', icon: 'sparkles-outline', section: 'new-products', tint: '#FFF4E5', iconColor: '#D97706' },
+  { title: 'Boost Products', icon: 'rocket-outline', section: 'boost-products', tint: '#F2EFFF', iconColor: '#7C3AED' },
+  { title: 'Team System', icon: 'people-outline', section: 'team-system', tint: '#EAF7EE', iconColor: '#16834A' },
+  { title: 'Video', icon: 'play-circle-outline', section: 'video', tint: '#FDECEF', iconColor: '#D92D6B' },
+  { title: 'Seller Dashboard', icon: 'bar-chart-outline', section: 'seller-dashboard', tint: '#E5F4FD', iconColor: '#0092EE' },
+  { title: 'Order List', icon: 'receipt-outline', section: 'order-list', tint: '#FFF7E5', iconColor: '#B54708' },
+  { title: 'Blog', icon: 'newspaper-outline', section: 'blog', tint: '#EEF4FF', iconColor: '#175CD3' },
+  { title: 'Search Products', icon: 'search-outline', section: 'search-products', tint: '#EAF7EE', iconColor: '#16834A' },
+];
+
 const DRAWER_ITEMS: DrawerItem[] = [
-  { label: 'Home', destination: 'home' },
-  { label: 'Search Products', destination: 'search' },
-  { label: 'All Products', destination: 'all-products' },
-  { label: 'Profile', destination: 'profile' },
-  { label: 'New Products', destination: 'new-products' },
-  { label: 'Wishlist', destination: 'wishlist' },
-  { label: 'Order List', destination: 'orders' },
-  { label: 'আমার অ্যানালিটিক্স', destination: 'section', section: 'my-analytics' },
-  { label: 'Videos', destination: 'section', section: 'video' },
-  { label: 'শপ সেটিংস', destination: 'section', section: 'shop-settings' },
-  { label: 'রেফারেল প্রোফাইল', destination: 'section', section: 'referral-profile' },
-  { label: 'পেমেন্ট অনুরোধ', destination: 'section', section: 'payment-request' },
-  { label: 'Support', destination: 'section', section: 'support' },
-  { label: 'ড্যাশবোর্ড', destination: 'section', section: 'seller-dashboard' },
+  { label: 'হোম', destination: 'home', icon: 'home-outline' },
+  { label: 'পণ্য খুঁজুন', destination: 'search', icon: 'search-outline' },
+  { label: 'সকল পণ্য', destination: 'all-products', icon: 'grid-outline' },
+  { label: 'প্রোফাইল', destination: 'profile', icon: 'person-outline' },
+  { label: 'নতুন পণ্য', destination: 'new-products', icon: 'sparkles-outline' },
+  { label: 'পছন্দের তালিকা', destination: 'wishlist', icon: 'heart-outline' },
+  { label: 'অর্ডার তালিকা', destination: 'orders', icon: 'receipt-outline' },
+  { label: 'আমার অ্যানালিটিক্স', destination: 'section', section: 'my-analytics', icon: 'analytics-outline' },
+  { label: 'ভিডিওসমূহ', destination: 'section', section: 'video', icon: 'play-circle-outline' },
+  { label: 'শপ সেটিংস', destination: 'section', section: 'shop-settings', icon: 'settings-outline' },
+  { label: 'রেফারেল প্রোফাইল', destination: 'section', section: 'referral-profile', icon: 'people-outline' },
+  { label: 'পেমেন্ট অনুরোধ', destination: 'section', section: 'payment-request', icon: 'wallet-outline' },
+  { label: 'সাপোর্ট', destination: 'section', section: 'support', icon: 'help-circle-outline' },
+  { label: 'ড্যাশবোর্ড', destination: 'section', section: 'seller-dashboard', icon: 'bar-chart-outline' },
 ];
 
 function NoticeCard({ notice }: { notice: DropshippingNotice }) {
@@ -98,6 +120,109 @@ function RetryNotice({ message, onRetry }: { message: string; onRetry: () => voi
         <Text className="text-[11px] font-bold text-primary">আবার চেষ্টা</Text>
       </TouchableOpacity>
     </View>
+  );
+}
+
+function OverviewCard({
+  item,
+  onPress,
+}: {
+  item: OverviewItem;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={item.title}
+      onPress={onPress}
+      className="mb-3 min-h-[122px] w-[48.5%] items-center justify-center rounded-[20px] border border-line bg-white px-3 py-4"
+      style={({ pressed }) => ({ opacity: pressed ? 0.78 : 1 })}
+    >
+      <View
+        className="mb-3 h-[50px] w-[50px] items-center justify-center rounded-2xl"
+        style={{ backgroundColor: item.tint }}
+      >
+        <Ionicons name={item.icon} size={25} color={item.iconColor} />
+      </View>
+      <Text numberOfLines={2} className="text-center text-[11px] font-bold leading-4 text-ink">
+        {item.title}
+      </Text>
+    </Pressable>
+  );
+}
+
+function DrawerMenuRow({
+  item,
+  index,
+  visible,
+  onPress,
+}: {
+  item: DrawerItem;
+  index: number;
+  visible: boolean;
+  onPress: () => void;
+}) {
+  const [entrance] = useState(() => new Animated.Value(0));
+  const [pressScale] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    if (!visible) {
+      entrance.setValue(0);
+      return;
+    }
+    const animation = Animated.timing(entrance, {
+      toValue: 1,
+      duration: 230,
+      delay: index * 28,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [entrance, index, visible]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entrance,
+        transform: [
+          {
+            translateX: entrance.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20, 0],
+            }),
+          },
+          { scale: pressScale },
+        ],
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        onPressIn={() => {
+          Animated.spring(pressScale, {
+            toValue: 0.97,
+            damping: 14,
+            stiffness: 260,
+            useNativeDriver: true,
+          }).start();
+        }}
+        onPressOut={() => {
+          Animated.spring(pressScale, {
+            toValue: 1,
+            damping: 12,
+            stiffness: 240,
+            useNativeDriver: true,
+          }).start();
+        }}
+        className="mb-1 flex-row items-center rounded-2xl px-3 py-2.5"
+      >
+        <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-primary-light">
+          <Ionicons name={item.icon} size={19} color={colors.primary} />
+        </View>
+        <Text className="flex-1 text-[13px] font-semibold text-ink">{item.label}</Text>
+        <Ionicons name="chevron-forward" size={16} color="#A0AEC0" />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -214,6 +339,17 @@ export function DropshippingIndexScreen() {
     }
   };
 
+  const openOverviewItem = (item: OverviewItem) => {
+    if (item.section === 'all-products') {
+      router.push('/(dropshipping)/all-products');
+      return;
+    }
+    router.push({
+      pathname: '/(dropshipping)/[section]',
+      params: { section: item.section },
+    });
+  };
+
   const refreshHome = () => {
     void Promise.all([
       profileQuery.refetch(),
@@ -246,9 +382,9 @@ export function DropshippingIndexScreen() {
 
         <View className="mr-2 flex-1 flex-row items-center">
           <Image
-            source={require('../../../../assets/icon.png')}
+            source={require('../../../../assets/logo.png')}
             resizeMode="contain"
-            className="h-8 w-8"
+            className="h-9 w-9"
           />
           <View className="ml-1.5 flex-1">
             <Text numberOfLines={1} className="text-[10px] font-extrabold tracking-tight text-ink">
@@ -340,6 +476,7 @@ export function DropshippingIndexScreen() {
           ) : null}
         </View>
 
+       
         <View className="mt-6">
           <View className="mb-3 flex-row items-center justify-between">
             <View>
@@ -389,6 +526,23 @@ export function DropshippingIndexScreen() {
             <Text className="mt-2 text-[12px] text-muted">এখন কোনো নতুন নোটিশ নেই</Text>
           </View>
         )}
+
+         <View className="mt-6">
+          <View className="mb-3">
+            <Text className="text-[16px] font-bold text-ink">Overview</Text>
+            <Text className="mt-0.5 text-[11px] text-muted">Select Section</Text>
+          </View>
+          <View className="flex-row flex-wrap justify-between">
+            {OVERVIEW_ITEMS.map((item) => (
+              <OverviewCard
+                key={item.section}
+                item={item}
+                onPress={() => openOverviewItem(item)}
+              />
+            ))}
+          </View>
+        </View>
+ 
       </ScrollView>
 
       <Modal
@@ -419,25 +573,36 @@ export function DropshippingIndexScreen() {
               elevation: 12,
             }}
           >
-            <View className="flex-row items-center border-b border-line px-4 py-4">
-              <Image
-                source={require('../../../../assets/icon.png')}
-                resizeMode="contain"
-                className="h-12 w-12 rounded-xl"
-              />
-              <View className="ml-3 flex-1">
-                <Text className="text-[14px] font-extrabold text-ink">EasyShoppingMallBD</Text>
-                <Text className="mt-0.5 text-[10px] text-muted">Dropshipping</Text>
+            <LinearGradient
+              colors={[colors.primary, colors.primaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ paddingHorizontal: 18, paddingVertical: 18 }}
+            >
+              <View className="flex-row items-center">
+                <View className="h-12 w-12 items-center justify-center rounded-2xl bg-white p-1">
+                  <Image
+                    source={require('../../../../assets/logo.png')}
+                    resizeMode="contain"
+                    className="h-full w-full"
+                  />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-[14px] font-extrabold text-white">EasyShoppingMallBD</Text>
+                  <View className="mt-1 self-start rounded-full bg-white/20 px-2 py-0.5">
+                    <Text className="text-[9px] font-bold tracking-wide text-white">DROPSHIPPING</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="ড্রয়ার বন্ধ করুন"
+                  onPress={closeDrawer}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white/20"
+                >
+                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="ড্রয়ার বন্ধ করুন"
-                onPress={closeDrawer}
-                className="h-9 w-9 items-center justify-center rounded-full bg-bg"
-              >
-                <Ionicons name="close" size={20} color={colors.ink} />
-              </TouchableOpacity>
-            </View>
+            </LinearGradient>
 
             {isAuthenticated && user ? (
               <View className="flex-row items-center border-b border-line px-4 py-4">
@@ -497,17 +662,19 @@ export function DropshippingIndexScreen() {
 
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerClassName="px-5 pb-5 pt-2"
+              contentContainerClassName="px-4 pb-5 pt-3"
             >
-              {DRAWER_ITEMS.map((item) => (
-                <TouchableOpacity
+              <Text className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[1.2px] text-muted">
+                দ্রুত মেনু
+              </Text>
+              {DRAWER_ITEMS.map((item, index) => (
+                <DrawerMenuRow
                   key={item.label}
-                  accessibilityRole="button"
+                  item={item}
+                  index={index}
+                  visible={drawerVisible}
                   onPress={() => openRoute(item)}
-                  className="py-3"
-                >
-                  <Text className="text-[14px] font-medium text-ink">{item.label}</Text>
-                </TouchableOpacity>
+                />
               ))}
             </ScrollView>
           </Animated.View>

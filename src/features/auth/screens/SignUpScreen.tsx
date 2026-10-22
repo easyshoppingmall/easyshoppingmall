@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  Image,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -172,6 +173,14 @@ export function SignUpScreen() {
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           {/* ── Header ──────────────────── */}
           <View style={styles.headerSection}>
+            <View style={styles.brandLogoCard}>
+              <Image
+                source={require('../../../../assets/logo.png')}
+                resizeMode="contain"
+                style={styles.brandLogo}
+                accessibilityLabel="EasyShoppingMallBD"
+              />
+            </View>
             <Text style={styles.brandTitle}>ইজি শপিং মল বিডি</Text>
             <Text style={styles.brandSubtitle}>কেনাকাটা ও ড্রপশিপিং, এক জায়গায়</Text>
           </View>
@@ -364,6 +373,26 @@ const styles = StyleSheet.create({
   headerSection: {
     alignItems: 'center',
     marginBottom: 24,
+  },
+  brandLogoCard: {
+    width: 86,
+    height: 86,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 9,
+  },
+  brandLogo: {
+    width: 76,
+    height: 76,
   },
   brandTitle: {
     fontSize: 26,

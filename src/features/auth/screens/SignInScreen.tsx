@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  Image,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -80,7 +81,12 @@ export function SignInScreen() {
           {/* ── Header ──────────────────── */}
           <View style={styles.headerSection}>
             <View style={styles.iconCircle}>
-              <Ionicons name="lock-open-outline" size={40} color={colors.primary} />
+              <Image
+                source={require('../../../../assets/logo.png')}
+                resizeMode="contain"
+                style={styles.brandLogo}
+                accessibilityLabel="EasyShoppingMallBD"
+              />
             </View>
             <Text style={styles.brandTitle}>ইজি শপিং মল বিডি</Text>
             <Text style={styles.brandSubtitle}>আপনার অ্যাকাউন্টে লগইন করুন</Text>
@@ -222,13 +228,24 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryLight,
+    width: 94,
+    height: 94,
+    borderRadius: 28,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    elevation: 5,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+  },
+  brandLogo: {
+    width: 82,
+    height: 82,
   },
   brandTitle: {
     fontSize: 26,

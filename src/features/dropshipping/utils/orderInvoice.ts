@@ -47,7 +47,7 @@ function escapeHtml(value: string): string {
 }
 
 export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData): string {
-  const defaultLogo = Image.resolveAssetSource(require('../../../../assets/icon.png'))?.uri;
+  const defaultLogo = Image.resolveAssetSource(require('../../../../assets/logo.png'))?.uri;
   const logo = defaultLogo || '';
   const rows = invoice.items.map((item) => `
     <tr>

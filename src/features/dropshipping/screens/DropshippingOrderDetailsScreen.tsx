@@ -617,7 +617,7 @@ export function DropshippingOrderDetailsScreen() {
           <View className="flex-row items-center">
             <View className="mr-3 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-primary-light">
               <Image
-                source={shopLogo ? { uri: shopLogo } : require('../../../../assets/icon.png')}
+                source={shopLogo ? { uri: shopLogo } : require('../../../../assets/logo.png')}
                 contentFit="cover"
                 cachePolicy="memory-disk"
                 style={{ width: '100%', height: '100%' }}
