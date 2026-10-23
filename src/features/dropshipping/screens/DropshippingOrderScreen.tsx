@@ -191,15 +191,21 @@ export function DropshippingOrderScreen() {
     .join('|');
   const validOrderItems = orderItems.flatMap((item) => {
     const quantity = Number(item.quantity);
-    const cost = item.product.dropshippingPrice;
-    if (!Number.isInteger(quantity) || quantity < 1 || cost === undefined) return [];
+    if (!Number.isInteger(quantity) || quantity < 1) return [];
+    const productCost = item.product.dropshippingPrice;
+    const cost = typeof productCost === 'number' && Number.isFinite(productCost) && productCost > 0
+      ? productCost
+      : undefined;
     return [{ ...item, parsedQuantity: quantity, cost }];
   });
   const quantityIsValid = validOrderItems.length === orderItems.length && orderItems.length > 0;
-  const subtotal = validOrderItems.reduce(
-    (total, item) => total + item.cost * item.parsedQuantity,
-    0
-  );
+  const hasUnknownCost = validOrderItems.some((item) => item.cost === undefined);
+  const subtotal = hasUnknownCost
+    ? undefined
+    : validOrderItems.reduce((total, item) => {
+        if (item.cost === undefined) return total;
+        return total + item.cost * item.parsedQuantity;
+      }, 0);
   const allSuggestedPricesAvailable = validOrderItems.length === orderItems.length &&
     validOrderItems.length > 0 &&
     validOrderItems.every((item) => item.product.productRank !== undefined);
@@ -207,23 +213,27 @@ export function DropshippingOrderScreen() {
     (total, item) => total + (item.product.productRank ?? 0) * item.parsedQuantity,
     0
   );
-  const estimatedProfit = allSuggestedPricesAvailable
+  const estimatedProfit = allSuggestedPricesAvailable && !hasUnknownCost
     ? validOrderItems.reduce(
-        (total, item) => total + ((item.product.productRank ?? item.cost) - item.cost) * item.parsedQuantity,
-        0
+        (total, item) => item.cost === undefined || item.product.productRank === undefined
+          ? total
+          : total + (item.product.productRank - item.cost) * item.parsedQuantity,
+        0,
       )
     : undefined;
   const estimateDeliveryCharge = ['ঢাকা', 'dhaka'].includes(district.trim().toLocaleLowerCase())
     ? 80
     : 130;
-  const activeCoupon =
+  const activeCoupon = !hasUnknownCost &&
     appliedCoupon &&
     appliedCoupon.code.toLocaleLowerCase() === couponCode.trim().toLocaleLowerCase() &&
     appliedCoupon.cartKey === orderCartKey
       ? appliedCoupon
       : undefined;
-  const couponDiscount = Math.min(activeCoupon?.result.discountAmount ?? 0, subtotal);
-  const totalEstimate = Math.max(0, subtotal + estimateDeliveryCharge - couponDiscount);
+  const couponDiscount = Math.min(activeCoupon?.result.discountAmount ?? 0, subtotal ?? 0);
+  const totalEstimate = subtotal === undefined
+    ? undefined
+    : Math.max(0, subtotal + estimateDeliveryCharge - couponDiscount);
   const locationOptions = useMemo(() => {
     if (locationPicker === 'division') {
       return bangladeshLocations.map((location) => location.division);
@@ -307,11 +317,6 @@ export function DropshippingOrderScreen() {
       Alert.alert('পণ্য যোগ করুন', 'অর্ডার করতে অন্তত একটি পণ্য যোগ করুন।');
       return;
     }
-    const itemWithoutPrice = orderItems.find((item) => item.product.dropshippingPrice === undefined);
-    if (itemWithoutPrice) {
-      Alert.alert('মূল্য পাওয়া যায়নি', `${itemWithoutPrice.product.name}-এর dropshipping খরচ পাওয়া যায়নি।`);
-      return;
-    }
     const outOfStockItem = orderItems.find((item) =>
       item.product.stockCount !== undefined && item.product.stockCount <= 0
     );
@@ -360,16 +365,34 @@ export function DropshippingOrderScreen() {
       return;
     }
 
-    const digits = phone.trim();
-    const payload: CreateDropshippingOrderPayload = {
-      products: validOrderItems.map((item) => ({
+    const orderProducts = validOrderItems.flatMap((item) => {
+      const sellingPrice = item.product.productRank ?? item.cost;
+      if (sellingPrice === undefined || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+        return [];
+      }
+      return [{
         productId: item.product.id,
         quantity: item.parsedQuantity,
-        sellingPrice: item.product.productRank ?? item.cost,
+        sellingPrice,
         ...(item.size ? { size: item.size } : {}),
         ...(item.color ? { color: item.color } : {}),
         ...(item.weight ? { weight: item.weight } : {}),
-      })),
+      }];
+    });
+    if (orderProducts.length !== validOrderItems.length) {
+      const itemWithoutSellingPrice = validOrderItems.find((item) =>
+        item.product.productRank === undefined && item.cost === undefined
+      );
+      Alert.alert(
+        'বিক্রয়মূল্য পাওয়া যায়নি',
+        `${itemWithoutSellingPrice?.product.name ?? 'একটি পণ্যের'} জন্য বিক্রয়মূল্য পাওয়া যায়নি।`
+      );
+      return;
+    }
+
+    const digits = phone.trim();
+    const payload: CreateDropshippingOrderPayload = {
+      products: orderProducts,
       delivery_address: {
         customer_name: customerName.trim(),
         address_line: address.trim(),
@@ -740,20 +763,27 @@ export function DropshippingOrderScreen() {
                       disabled={
                         couponMutation.isPending ||
                         !couponCode.trim() ||
-                        !quantityIsValid
+                        !quantityIsValid ||
+                        hasUnknownCost
                       }
                       onPress={() => {
+                        const cartItems = validOrderItems.flatMap((item) =>
+                          item.cost === undefined
+                            ? []
+                            : [{
+                                productId: item.product.id,
+                                quantity: item.parsedQuantity,
+                                price: item.cost,
+                              }]
+                        );
+                        if (cartItems.length !== validOrderItems.length) return;
                         couponMutation.mutate({
                           code: couponCode.trim(),
                           cartKey: orderCartKey,
-                          cartItems: validOrderItems.map((item) => ({
-                            productId: item.product.id,
-                            quantity: item.parsedQuantity,
-                            price: item.cost,
-                          })),
+                          cartItems,
                         });
                       }}
-                      className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${couponMutation.isPending || !couponCode.trim() ? 'bg-primary/50' : 'bg-primary'}`}
+                      className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${couponMutation.isPending || !couponCode.trim() || !quantityIsValid || hasUnknownCost ? 'bg-primary/50' : 'bg-primary'}`}
                     >
                       {couponMutation.isPending ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
@@ -771,6 +801,11 @@ export function DropshippingOrderScreen() {
                 {activeCoupon ? (
                   <Text className="mt-2 text-[10px] font-semibold text-emerald-700">
                     কুপন প্রয়োগ হয়েছে · ছাড় {formatDropshippingTaka(couponDiscount)}
+                  </Text>
+                ) : null}
+                {hasUnknownCost ? (
+                  <Text className="mt-2 text-[10px] leading-4 text-amber-700">
+                    কিছু পণ্যের dropshipping খরচ API-তে নেই। তাই মোট খরচ, লাভ ও কুপন হিসাব দেখানো যাচ্ছে না; অনুমান করে কোনো মূল্য ব্যবহার করা হবে না।
                   </Text>
                 ) : null}
               </View>
@@ -830,7 +865,9 @@ export function DropshippingOrderScreen() {
                 ) : null}
                 <View className="mb-2 flex-row justify-between">
                   <Text className="text-[12px] text-muted">পণ্য খরচ মোট</Text>
-                  <Text className="text-[12px] font-semibold text-ink">{formatDropshippingTaka(subtotal)}</Text>
+                  <Text className="text-[12px] font-semibold text-ink">
+                    {subtotal === undefined ? 'তথ্য নেই' : formatDropshippingTaka(subtotal)}
+                  </Text>
                 </View>
                 {estimatedProfit !== undefined ? (
                   <View className="mb-2 flex-row justify-between">
@@ -852,7 +889,9 @@ export function DropshippingOrderScreen() {
                 </View>
                 <View className="flex-row justify-between border-t border-line pt-2">
                   <Text className="text-[13px] font-bold text-ink">সার্ভার অর্ডারের আনুমানিক মোট</Text>
-                  <Text className="text-[15px] font-extrabold text-primary">{formatDropshippingTaka(totalEstimate)}</Text>
+                  <Text className="text-[15px] font-extrabold text-primary">
+                    {totalEstimate === undefined ? 'তথ্য নেই' : formatDropshippingTaka(totalEstimate)}
+                  </Text>
                 </View>
                 <Text className="mt-2 text-[10px] leading-4 text-muted">
                   প্রস্তাবিত বিক্রয়মূল্য/লাভ অনুমান; বর্তমান API-তে custom selling price ও COD নেই। কুপন, ডেলিভারি ও চূড়ান্ত অর্ডার মোট সার্ভার নিশ্চিত করবে।
@@ -937,8 +976,7 @@ export function DropshippingOrderScreen() {
                     const alreadyAdded = orderItems.some(
                       (orderItem) => orderItem.product.id === searchProduct.id
                     );
-                    const unavailable = searchProduct.dropshippingPrice === undefined ||
-                      searchProduct.stockCount === 0;
+                    const unavailable = searchProduct.stockCount === 0;
                     return (
                       <View className="mb-2 flex-row items-center rounded-xl border border-line bg-bg p-2.5">
                         <Image

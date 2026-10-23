@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
-import { useAppSelector } from '../../../store/hooks';
+import { addDropshippingCartItem } from '../../../store/dropshippingCartSlice';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { DropshippingCatalogProductCard } from '../components/DropshippingCatalogProductCard';
 import {
   dropshippingHomeQueryKeys,
@@ -66,6 +67,7 @@ export function DropshippingSubcategoryProductsScreen() {
   const routeCategoryId = firstParam(params.categoryId);
   const routeName = firstParam(params.name);
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const userId = useAppSelector((state) => state.auth.user?._id);
   const subcategoriesQuery = useDropshippingSubcategoriesQuery();
   const wishlistQuery = useDropshippingWishlistQuery();
@@ -120,6 +122,25 @@ export function DropshippingSubcategoryProductsScreen() {
   const changePage = (nextPage: number) => {
     setPagination({ subcategoryId, page: nextPage });
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  };
+  const checkoutProduct = (product: DropshippingProduct) => {
+    const hasVariants = Boolean(
+      product.sizes?.length || product.colors?.length || product.weights?.length
+    );
+    if (hasVariants) {
+      router.push({
+        pathname: '/(dropshipping)/product/[id]',
+        params: { id: product.id },
+      });
+      return;
+    }
+    dispatch(addDropshippingCartItem({
+      product,
+      size: '',
+      color: '',
+      weight: '',
+    }));
+    router.push('/(dropshipping)/cart');
   };
 
   return (
@@ -203,6 +224,8 @@ export function DropshippingSubcategoryProductsScreen() {
               <View style={{ width: cardWidth, marginBottom: gap }}>
                 <DropshippingCatalogProductCard
                   product={item}
+                  checkoutDisabled={item.stockCount === 0}
+                  onCheckout={() => checkoutProduct(item)}
                   isWishlisted={wishlistQuery.data?.some((saved) => saved.id === item.id) ?? false}
                   onToggleWishlist={() =>
                     wishlistMutation.mutate({

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
@@ -117,6 +118,16 @@ export function DropshippingProductDetailsScreen() {
       await Linking.openURL(product.videoUrl);
     } catch {
       Alert.alert('ভিডিও খোলা যায়নি', 'ভিডিও লিংকটি পরে আবার চেষ্টা করুন।');
+    }
+  };
+
+  const copyDescription = async () => {
+    if (!product?.description) return;
+    try {
+      await Clipboard.setStringAsync(product.description);
+      Alert.alert('কপি হয়েছে', 'পণ্যের বিবরণ ক্লিপবোর্ডে কপি করা হয়েছে।');
+    } catch {
+      Alert.alert('কপি করা যায়নি', 'আবার চেষ্টা করুন।');
     }
   };
 
@@ -289,7 +300,18 @@ export function DropshippingProductDetailsScreen() {
 
             {product.description ? (
               <View className="mt-5">
-                <Text className="text-[13px] font-bold text-ink">পণ্যের বিবরণ</Text>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-[13px] font-bold text-ink">পণ্যের বিবরণ</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="পণ্যের বিবরণ কপি করুন"
+                    onPress={() => void copyDescription()}
+                    className="min-h-9 flex-row items-center rounded-lg bg-primary-light px-3"
+                  >
+                    <Ionicons name="copy-outline" size={15} color={colors.primary} />
+                    <Text className="ml-1.5 text-[10px] font-bold text-primary-dark">কপি</Text>
+                  </Pressable>
+                </View>
                 <Text className="mt-2 text-[12px] leading-6 text-muted">
                   {product.description}
                 </Text>
@@ -365,8 +387,7 @@ export function DropshippingProductDetailsScreen() {
 
             <Pressable
               accessibilityRole="button"
-              disabled={product.dropshippingPrice === undefined ||
-                (product.stockCount !== undefined && product.stockCount <= 0) ||
+              disabled={(product.stockCount !== undefined && product.stockCount <= 0) ||
                 cannotAddSelectedStock}
               onPress={() => {
                 dispatch(addDropshippingCartItem({
@@ -377,7 +398,7 @@ export function DropshippingProductDetailsScreen() {
                 }));
                 router.push('/(dropshipping)/cart');
               }}
-              className={`mt-5 min-h-12 flex-row items-center justify-center rounded-xl px-4 py-3 ${product.dropshippingPrice === undefined || (product.stockCount !== undefined && product.stockCount <= 0) || cannotAddSelectedStock ? 'bg-primary/50' : 'bg-primary'}`}
+              className={`mt-5 min-h-12 flex-row items-center justify-center rounded-xl px-4 py-3 ${(product.stockCount !== undefined && product.stockCount <= 0) || cannotAddSelectedStock ? 'bg-primary/50' : 'bg-primary'}`}
             >
               <Ionicons name="bag-check-outline" size={18} color="#FFFFFF" />
               <Text className="ml-2 text-[12px] font-bold text-white">

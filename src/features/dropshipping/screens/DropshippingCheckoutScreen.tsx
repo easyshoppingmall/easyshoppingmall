@@ -92,7 +92,7 @@ function AmountRow({
   negative = false,
 }: {
   label: string;
-  amount: number;
+  amount?: number;
   emphasize?: boolean;
   negative?: boolean;
 }) {
@@ -102,7 +102,9 @@ function AmountRow({
         {label}
       </Text>
       <Text className={`${emphasize ? 'text-[14px] font-extrabold' : 'text-[11px] font-semibold'} ${negative ? 'text-emerald-700' : emphasize ? 'text-primary' : 'text-ink'}`}>
-        {negative ? '−' : ''}{formatDropshippingTaka(Math.abs(amount))}
+        {amount === undefined
+          ? 'তথ্য নেই'
+          : `${negative ? '−' : ''}${formatDropshippingTaka(Math.abs(amount))}`}
       </Text>
     </View>
   );
@@ -140,21 +142,27 @@ export function DropshippingCheckoutScreen() {
   const customerName = customerNameDraft ?? profileQuery.data?.name ?? user?.name ?? '';
   const phone = phoneDraft ??
     String(profileQuery.data?.mobile ?? profileQuery.data?.phone ?? user?.phone ?? '');
+  const hasUnknownCost = items.some((item) =>
+    item.product.dropshippingPrice === undefined ||
+    !Number.isFinite(item.product.dropshippingPrice) ||
+    item.product.dropshippingPrice <= 0
+  );
   const cartKey = items
     .map((item) => `${item.key}:${item.quantity}:${item.product.dropshippingPrice ?? ''}`)
     .sort()
     .join('|');
-  const activeCoupon = appliedCoupon &&
+  const activeCoupon = !hasUnknownCost && appliedCoupon &&
     appliedCoupon.code.toLowerCase() === couponCode.trim().toLowerCase() &&
     appliedCoupon.cartKey === cartKey
       ? appliedCoupon
       : undefined;
-  const subtotal = items.reduce(
+  const knownSubtotal = items.reduce(
     (total, item) => roundDropshippingMoney(
       total + roundDropshippingMoney((item.product.dropshippingPrice ?? 0) * item.quantity)
     ),
     0
   );
+  const subtotal = hasUnknownCost ? undefined : knownSubtotal;
   const sellingTotal = items.reduce((total, item) => {
     const sellingPrice = Number(item.sellingPrice);
     return roundDropshippingMoney(total + (item.sellingPrice.trim() !== '' &&
@@ -163,11 +171,15 @@ export function DropshippingCheckoutScreen() {
       ? roundDropshippingMoney(sellingPrice * item.quantity)
       : 0));
   }, 0);
-  const estimatedProfit = roundDropshippingMoney(sellingTotal - subtotal);
+  const estimatedProfit = hasUnknownCost
+    ? undefined
+    : roundDropshippingMoney(sellingTotal - knownSubtotal);
   const deliveryCharge = district.toLowerCase() === 'ঢাকা' || district.toLowerCase() === 'dhaka'
     ? 80
     : 130;
-  const couponDiscount = roundDropshippingMoney(Math.min(activeCoupon?.discount ?? 0, subtotal));
+  const couponDiscount = roundDropshippingMoney(
+    Math.min(activeCoupon?.discount ?? 0, knownSubtotal)
+  );
   const estimatedCustomerPayable = roundDropshippingMoney(
     Math.max(0, sellingTotal + deliveryCharge - couponDiscount)
   );
@@ -214,15 +226,6 @@ export function DropshippingCheckoutScreen() {
   const validateCheckout = (): boolean => {
     if (!items.length) {
       Alert.alert('কার্ট খালি', 'Checkout করার আগে Dropshipping Cart-এ পণ্য যোগ করুন।');
-      return false;
-    }
-    const invalidCostItem = items.find((item) =>
-      item.product.dropshippingPrice === undefined ||
-      !Number.isFinite(item.product.dropshippingPrice) ||
-      item.product.dropshippingPrice <= 0
-    );
-    if (invalidCostItem) {
-      Alert.alert('পণ্যের খরচ পাওয়া যায়নি', `${invalidCostItem.product.name}-এর সঠিক Dropshipping Price নেই।`);
       return false;
     }
     const invalidSellingPriceItem = items.find((item) => {
@@ -451,7 +454,9 @@ export function DropshippingCheckoutScreen() {
                       <View className="ml-3 flex-1 justify-center">
                         <Text numberOfLines={2} className="text-[11px] font-bold text-ink">{item.product.name}</Text>
                         <Text className="mt-1 text-[10px] text-muted">
-                          Dropshipping: {formatDropshippingTaka(item.product.dropshippingPrice ?? 0)}
+                          Dropshipping Cost: {item.product.dropshippingPrice === undefined
+                            ? 'API-তে নেই'
+                            : formatDropshippingTaka(item.product.dropshippingPrice)}
                           {' · '}Qty {formatDropshippingNumber(item.quantity)}
                         </Text>
                         <Text className="mt-1 text-[10px] font-semibold text-primary">
@@ -519,6 +524,11 @@ export function DropshippingCheckoutScreen() {
                     </Pressable>
                   ) : null}
                 </View>
+                {hasUnknownCost ? (
+                  <Text className="mb-2 text-[10px] leading-4 text-amber-800">
+                    কিছু পণ্যের Dropshipping Cost API-তে নেই, তাই কুপনের মূল্য যাচাই করা যাচ্ছে না।
+                  </Text>
+                ) : null}
                 <View className="flex-row items-center">
                   <TextInput
                     value={couponCode}
@@ -533,7 +543,7 @@ export function DropshippingCheckoutScreen() {
                   />
                   <Pressable
                     accessibilityRole="button"
-                    disabled={!couponCode.trim() || couponMutation.isPending}
+                    disabled={!couponCode.trim() || couponMutation.isPending || hasUnknownCost}
                     onPress={() => couponMutation.mutate({
                       code: couponCode.trim(),
                       cartKey,
@@ -543,7 +553,7 @@ export function DropshippingCheckoutScreen() {
                         price: item.product.dropshippingPrice ?? 0,
                       })),
                     })}
-                    className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${!couponCode.trim() || couponMutation.isPending ? 'bg-primary/50' : 'bg-primary'}`}
+                    className={`min-h-11 min-w-20 items-center justify-center rounded-xl px-4 ${!couponCode.trim() || couponMutation.isPending || hasUnknownCost ? 'bg-primary/50' : 'bg-primary'}`}
                   >
                     {couponMutation.isPending
                       ? <ActivityIndicator size="small" color="#FFFFFF" />
@@ -691,14 +701,18 @@ export function DropshippingCheckoutScreen() {
                       <Text className="text-[12px] font-bold text-ink">{item.product.name}</Text>
                       <Text className="mt-1 text-[10px] text-muted">
                         Quantity {formatDropshippingNumber(item.quantity)}
-                        {' · '}Dropshipping Cost {formatDropshippingTaka(cost)} / পিস
+                        {' · '}Dropshipping Cost {item.product.dropshippingPrice === undefined
+                          ? 'API-তে নেই'
+                          : `${formatDropshippingTaka(cost)} / পিস`}
                       </Text>
                       <Text className="mt-1 text-[10px] text-muted">
                         Customer Selling Price {formatDropshippingTaka(sellingPrice)} / পিস
                         {' · '}লাইন মোট {formatDropshippingTaka(roundDropshippingMoney(sellingPrice * item.quantity))}
                       </Text>
                       <Text className="mt-1 text-[10px] font-semibold text-ink">
-                        মোট Cost {formatDropshippingTaka(roundDropshippingMoney(cost * item.quantity))}
+                        মোট Cost {item.product.dropshippingPrice === undefined
+                          ? 'তথ্য নেই'
+                          : formatDropshippingTaka(roundDropshippingMoney(cost * item.quantity))}
                       </Text>
                     </View>
                   );
@@ -831,9 +845,9 @@ function OrderSummary({
   couponDiscount,
   estimatedCustomerPayable,
 }: {
-  subtotal: number;
+  subtotal?: number;
   sellingTotal: number;
-  profit: number;
+  profit?: number;
   deliveryCharge: number;
   couponDiscount: number;
   estimatedCustomerPayable: number;
@@ -845,8 +859,8 @@ function OrderSummary({
       <AmountRow label="Total Selling Price" amount={sellingTotal} />
       <View className="mb-2 flex-row justify-between">
         <Text className="text-[11px] text-muted">Estimated Profit (selling − cost)</Text>
-        <Text className={`text-[11px] font-bold ${profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-          {formatDropshippingTaka(profit)}
+        <Text className={`text-[11px] font-bold ${profit === undefined ? 'text-muted' : profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          {profit === undefined ? 'তথ্য নেই' : formatDropshippingTaka(profit)}
         </Text>
       </View>
       <AmountRow label="আনুমানিক Delivery Charge" amount={deliveryCharge} />

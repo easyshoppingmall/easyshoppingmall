@@ -26,6 +26,11 @@ export function DropshippingCartScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const items = useAppSelector((state) => state.dropshippingCart.items);
+  const hasUnknownCost = items.some((item) =>
+    item.product.dropshippingPrice === undefined ||
+    !Number.isFinite(item.product.dropshippingPrice) ||
+    item.product.dropshippingPrice <= 0
+  );
   const totals = useMemo(() => items.reduce((summary, item) => {
     const cost = item.product.dropshippingPrice ?? 0;
     const sellingPrice = Number(item.sellingPrice);
@@ -40,7 +45,9 @@ export function DropshippingCartScreen() {
       selling: roundDropshippingMoney(summary.selling + roundDropshippingMoney(validSellingPrice * item.quantity)),
     };
   }, { quantity: 0, cost: 0, selling: 0 }), [items]);
-  const profit = roundDropshippingMoney(totals.selling - totals.cost);
+  const profit = hasUnknownCost
+    ? undefined
+    : roundDropshippingMoney(totals.selling - totals.cost);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
@@ -106,7 +113,7 @@ export function DropshippingCartScreen() {
                         {item.product.name}
                       </Text>
                       <Text className="mt-1 text-[11px] font-semibold text-primary">
-                        Dropshipping Price: {cost === undefined ? 'তথ্য নেই' : formatDropshippingTaka(cost)}
+                        Dropshipping Price: {cost === undefined ? 'API-তে নেই' : formatDropshippingTaka(cost)}
                       </Text>
                       {item.size || item.color || item.weight ? (
                         <Text className="mt-1 text-[10px] text-muted">
@@ -191,14 +198,22 @@ export function DropshippingCartScreen() {
 
             <View className="rounded-[22px] border border-line bg-white p-4">
               <Text className="mb-3 text-[14px] font-extrabold text-ink">Cart Summary</Text>
-              <SummaryRow label="Total Dropshipping Cost" amount={totals.cost} />
+              <SummaryRow
+                label="Total Dropshipping Cost"
+                amount={hasUnknownCost ? undefined : totals.cost}
+              />
               <SummaryRow label="Total Selling Price" amount={totals.selling} />
               <View className="mt-2 flex-row justify-between border-t border-line pt-3">
                 <Text className="text-[13px] font-bold text-ink">Estimated Profit</Text>
-                <Text className={`text-[14px] font-extrabold ${profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                  {formatDropshippingTaka(profit)}
+                <Text className={`text-[14px] font-extrabold ${profit === undefined ? 'text-muted' : profit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {profit === undefined ? 'তথ্য নেই' : formatDropshippingTaka(profit)}
                 </Text>
               </View>
+              {hasUnknownCost ? (
+                <Text className="mt-2 text-[10px] leading-4 text-amber-800">
+                  পণ্যের Dropshipping Cost API-তে নেই। সঠিক খরচ ছাড়া লাভের হিসাব দেখানো যাচ্ছে না।
+                </Text>
+              ) : null}
               <Text className="mt-2 text-[10px] leading-4 text-muted">
                 Delivery charge ও coupon checkout/API-এর নিয়ম অনুযায়ী নির্ধারিত হবে।
               </Text>
@@ -237,11 +252,13 @@ export function DropshippingCartScreen() {
   );
 }
 
-function SummaryRow({ label, amount }: { label: string; amount: number }) {
+function SummaryRow({ label, amount }: { label: string; amount?: number }) {
   return (
     <View className="mb-2 flex-row justify-between">
       <Text className="text-[11px] text-muted">{label}</Text>
-      <Text className="text-[11px] font-semibold text-ink">{formatDropshippingTaka(amount)}</Text>
+      <Text className="text-[11px] font-semibold text-ink">
+        {amount === undefined ? 'তথ্য নেই' : formatDropshippingTaka(amount)}
+      </Text>
     </View>
   );
 }

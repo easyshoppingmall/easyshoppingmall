@@ -16,7 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
-import { useAppSelector } from '../../../store/hooks';
+import { addDropshippingCartItem } from '../../../store/dropshippingCartSlice';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { DropshippingCatalogProductCard } from '../components/DropshippingCatalogProductCard';
 import {
   formatDropshippingNumber,
@@ -81,6 +82,7 @@ function EmptySearchState({
 export function DropshippingSearchScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const userId = useAppSelector((state) => state.auth.user?._id);
   const wishlistQuery = useDropshippingWishlistQuery();
   const [searchText, setSearchText] = useState('');
@@ -118,6 +120,25 @@ export function DropshippingSearchScreen() {
       );
     },
   });
+  const checkoutProduct = (product: DropshippingProduct) => {
+    const hasVariants = Boolean(
+      product.sizes?.length || product.colors?.length || product.weights?.length
+    );
+    if (hasVariants) {
+      router.push({
+        pathname: '/(dropshipping)/product/[id]',
+        params: { id: product.id },
+      });
+      return;
+    }
+    dispatch(addDropshippingCartItem({
+      product,
+      size: '',
+      color: '',
+      weight: '',
+    }));
+    router.push('/(dropshipping)/cart');
+  };
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -263,6 +284,8 @@ export function DropshippingSearchScreen() {
             <View style={{ flex: 1, marginBottom: 12 }}>
               <DropshippingCatalogProductCard
                 product={item}
+                checkoutDisabled={item.stockCount === 0}
+                onCheckout={() => checkoutProduct(item)}
                 isWishlisted={isWishlisted}
                 onToggleWishlist={() =>
                   wishlistMutation.mutate({ productId: item.id, add: !isWishlisted })

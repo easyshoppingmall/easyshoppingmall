@@ -16,6 +16,8 @@ interface DropshippingCatalogProductCardProps {
   wishlistDisabled: boolean;
   wishlistPending: boolean;
   isVisible: boolean;
+  onCheckout: () => void;
+  checkoutDisabled: boolean;
 }
 
 export function DropshippingCatalogProductCard({
@@ -26,6 +28,8 @@ export function DropshippingCatalogProductCard({
   wishlistDisabled,
   wishlistPending,
   isVisible,
+  onCheckout,
+  checkoutDisabled,
 }: DropshippingCatalogProductCardProps) {
   const detailsQuery = useDropshippingProductDetailsQuery(
     product.videoUrl || !isVisible ? '' : product.id
@@ -65,7 +69,7 @@ export function DropshippingCatalogProductCard({
         accessibilityRole="button"
         accessibilityLabel={`${product.name}, বিস্তারিত দেখুন`}
         onPress={onPress}
-        className="h-[150px] items-center justify-center overflow-hidden bg-primary-light"
+        className="h-[112px] items-center justify-center overflow-hidden bg-primary-light"
       >
         {product.image ? (
           <Image
@@ -130,35 +134,54 @@ export function DropshippingCatalogProductCard({
       <Pressable
         accessibilityRole="button"
         onPress={onPress}
-        className="min-h-[156px] justify-between p-3"
+        className="min-h-[134px] justify-between p-2.5"
       >
         {product.brand ? (
           <Text numberOfLines={1} className="mb-1 text-[9px] font-medium text-muted">
             {product.brand}
           </Text>
         ) : null}
-        <Text numberOfLines={2} className="min-h-[36px] text-[12px] font-bold leading-[18px] text-ink">
+        <Text numberOfLines={2} className="min-h-[32px] text-[11px] font-bold leading-4 text-ink">
           {product.name}
         </Text>
-        <View className="mt-2">
-          <Text className="text-[9px] text-muted">আপনার পণ্য খরচ</Text>
-          <Text numberOfLines={1} className="mt-0.5 text-[14px] font-extrabold text-primary-dark">
+        <View className="mt-1.5">
+          <Text className="text-[8px] text-muted">ড্রপশিপিং খরচ</Text>
+          <Text numberOfLines={1} className="mt-0.5 text-[12px] font-extrabold text-primary-dark">
             {product.dropshippingPrice === undefined
-              ? 'মূল্য পাওয়া যায়নি'
+              ? 'API-তে নেই'
               : formatDropshippingTaka(product.dropshippingPrice)}
           </Text>
-          <Text className="mt-1.5 text-[9px] text-muted">প্রস্তাবিত বিক্রয়মূল্য (Product Rank)</Text>
-          <Text numberOfLines={1} className="mt-0.5 text-[13px] font-bold text-ink">
+          <Text className="mt-1 text-[8px] text-muted">প্রস্তাবিত বিক্রয়মূল্য</Text>
+          <Text numberOfLines={1} className="mt-0.5 text-[11px] font-bold text-ink">
             {product.productRank === undefined
-              ? 'তথ্য পাওয়া যায়নি'
+              ? 'API-তে নেই'
               : formatDropshippingTaka(product.productRank)}
           </Text>
-          <Text className={`mt-1 text-[10px] font-bold ${estimatedProfit === undefined ? 'text-muted' : estimatedProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          <Text className="mt-1 text-[8px] text-muted">ক্যাটালগ মূল্য (Dropshipping Cost নয়)</Text>
+          <Text numberOfLines={1} className="mt-0.5 text-[10px] font-semibold text-ink">
+            {formatDropshippingTaka(product.price)}
+          </Text>
+          <Text className={`mt-1 text-[9px] font-bold ${estimatedProfit === undefined ? 'text-muted' : estimatedProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
             {estimatedProfit === undefined
-              ? 'আনুমানিক লাভ: তথ্য নেই'
+              ? 'লাভ: খরচের তথ্য নেই'
               : `আনুমানিক লাভ: ${formatDropshippingTaka(estimatedProfit)} / পিস`}
           </Text>
         </View>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name} কার্টে যোগ করে checkout`}
+        accessibilityState={{ disabled: checkoutDisabled }}
+        disabled={checkoutDisabled}
+        onPress={onCheckout}
+        className={`mx-2.5 mb-2.5 min-h-10 flex-row items-center justify-center rounded-xl px-2 ${
+          checkoutDisabled ? 'bg-primary/40' : 'bg-primary'
+        }`}
+      >
+        <Ionicons name="cart-outline" size={15} color="#FFFFFF" />
+        <Text numberOfLines={1} className="ml-1.5 text-[10px] font-bold text-white">
+          {product.stockCount === 0 ? 'স্টক নেই' : 'কার্টে যোগ • Checkout'}
+        </Text>
       </Pressable>
     </View>
   );

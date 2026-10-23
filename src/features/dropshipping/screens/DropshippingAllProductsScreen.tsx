@@ -148,6 +148,19 @@ export function DropshippingAllProductsScreen() {
     }
     return groups;
   }, [subcategoriesQuery.data]);
+  const orderedCategories = useMemo(() => {
+    const categories = categoriesQuery.data ?? [];
+    return categories
+      .map((category, index) => ({
+        category,
+        index,
+        subcategoryCount: groupedSubcategories.get(category.id)?.length ?? 0,
+      }))
+      .sort((left, right) =>
+        right.subcategoryCount - left.subcategoryCount || left.index - right.index
+      )
+      .map(({ category }) => category);
+  }, [categoriesQuery.data, groupedSubcategories]);
 
   const retry = () => {
     void Promise.all([categoriesQuery.refetch(), subcategoriesQuery.refetch()]);
@@ -223,7 +236,7 @@ export function DropshippingAllProductsScreen() {
               <Text className="mt-3 text-[13px] font-bold text-ink">কোনো সক্রিয় ক্যাটাগরি নেই</Text>
             </View>
           ) : (
-            (categoriesQuery.data ?? []).map((category) => (
+            orderedCategories.map((category) => (
               <CategorySection
                 key={category.id}
                 category={category}

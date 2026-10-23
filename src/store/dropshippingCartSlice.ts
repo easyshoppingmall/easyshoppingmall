@@ -36,17 +36,21 @@ const dropshippingCartSlice = createSlice({
     ) => {
       const key = cartItemKey(action.payload);
       const current = state.items.find((item) => item.key === key);
+      const suggestedSellingPrice =
+        action.payload.product.productRank ?? action.payload.product.dropshippingPrice;
       if (current) {
         current.quantity += 1;
         current.product = action.payload.product;
+        if (!current.sellingPrice.trim() && suggestedSellingPrice !== undefined) {
+          current.sellingPrice = String(suggestedSellingPrice);
+        }
         return;
       }
-      const cost = action.payload.product.dropshippingPrice;
       state.items.push({
         ...action.payload,
         key,
         quantity: 1,
-        sellingPrice: cost === undefined ? '' : String(action.payload.product.productRank ?? cost),
+        sellingPrice: suggestedSellingPrice === undefined ? '' : String(suggestedSellingPrice),
       });
     },
     updateDropshippingCartItem: (
