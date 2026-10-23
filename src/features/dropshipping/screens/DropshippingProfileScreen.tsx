@@ -30,6 +30,7 @@ import {
 } from '../api/queries';
 import {
   dropshippingProfileErrorMessage,
+  getDropshippingReferralLink,
   updateDropshippingUserImage,
 } from '../api/profileApi';
 
@@ -182,9 +183,7 @@ export function DropshippingProfileScreen() {
     0
   );
   const referralCode = profile?.referralCode;
-  const referralLink = referralCode
-    ? `https://easyshoppingmallbd.com/signup?ref=${encodeURIComponent(referralCode)}`
-    : '';
+  const referralLink = getDropshippingReferralLink(referralCode);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft>(() => profileDraftFrom(profile));
@@ -588,7 +587,7 @@ export function DropshippingProfileScreen() {
                   <Text className="mt-1 text-[9px] text-white/75">রেফারেল কোড শেয়ার করে সদস্য বাড়ান</Text>
                 </View>
               </View>
-              {referralCode ? (
+              {referralCode && referralLink ? (
                 <>
                   <View className="mt-4 flex-row items-center rounded-xl bg-white px-3 py-2.5">
                     <View className="flex-1">
@@ -622,7 +621,9 @@ export function DropshippingProfileScreen() {
                 title="মোট রেফারেল"
                 value={profileDashboardQuery.isPending
                   ? '…'
-                  : formatDropshippingNumber(referralData?.count ?? profile?.referralCount ?? 0)}
+                  : referralData?.count !== undefined || profile?.referralCount !== undefined
+                    ? formatDropshippingNumber(referralData?.count ?? profile?.referralCount ?? 0)
+                    : '—'}
                 tint="bg-violet-50"
                 iconColor="#7C3AED"
               />
@@ -640,7 +641,9 @@ export function DropshippingProfileScreen() {
               title="সাম্প্রতিক রেফারেল সদস্য"
               action={
                 <Text className="text-[9px] text-muted">
-                  {formatDropshippingNumber(referralData?.users.length ?? 0)} জন
+                  {referralData?.count !== undefined
+                    ? `${formatDropshippingNumber(referralData.count)} জন`
+                    : '—'}
                 </Text>
               }
             />
@@ -648,14 +651,21 @@ export function DropshippingProfileScreen() {
               <View className="items-center rounded-2xl border border-line bg-white py-5">
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : (referralData?.users.length ?? 0) === 0 ? (
+            ) : referralData?.users === undefined ? (
+              <View className="items-center rounded-2xl border border-line bg-white px-4 py-6">
+                <Ionicons name="information-circle-outline" size={25} color={colors.muted} />
+                <Text className="mt-2 text-center text-[10px] text-muted">
+                  API-তে রেফারেল সদস্যের তালিকা পাওয়া যায়নি।
+                </Text>
+              </View>
+            ) : referralData.users.length === 0 ? (
               <View className="items-center rounded-2xl border border-line bg-white px-4 py-6">
                 <Ionicons name="people-outline" size={25} color={colors.muted} />
                 <Text className="mt-2 text-[10px] text-muted">এখনো কোনো রেফারেল সদস্য নেই।</Text>
               </View>
             ) : (
               <View className="rounded-2xl border border-line bg-white px-3">
-                {referralData?.users.slice(0, 5).map((referredUser, index, users) => (
+                {referralData.users.slice(0, 5).map((referredUser, index, users) => (
                   <View key={referredUser._id} className={`flex-row items-center py-3 ${index < users.length - 1 ? 'border-b border-line' : ''}`}>
                     <View className="mr-3 h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary-light">
                       {referredUser.image ? (
@@ -665,7 +675,7 @@ export function DropshippingProfileScreen() {
                       )}
                     </View>
                     <View className="flex-1">
-                      <Text numberOfLines={1} className="text-[10px] font-bold text-ink">{referredUser.name || 'নতুন সদস্য'}</Text>
+                      <Text numberOfLines={1} className="text-[10px] font-bold text-ink">{referredUser.name || 'নাম পাওয়া যায়নি'}</Text>
                       {referredUser.email ? <Text numberOfLines={1} className="mt-0.5 text-[9px] text-muted">{referredUser.email}</Text> : null}
                     </View>
                     <Text className="ml-2 text-[8px] text-muted">{dateLabel(referredUser.createdAt)}</Text>
@@ -675,13 +685,20 @@ export function DropshippingProfileScreen() {
             )}
 
             <SectionTitle title="সাম্প্রতিক রেফারেল কমিশন" />
-            {(referralData?.orders.length ?? 0) === 0 ? (
+            {referralData?.orders === undefined ? (
+              <View className="items-center rounded-2xl border border-line bg-white px-4 py-6">
+                <Ionicons name="information-circle-outline" size={25} color={colors.muted} />
+                <Text className="mt-2 text-center text-[10px] text-muted">
+                  API-তে রেফারেল অর্ডারের তথ্য পাওয়া যায়নি।
+                </Text>
+              </View>
+            ) : referralData.orders.length === 0 ? (
               <View className="items-center rounded-2xl border border-line bg-white px-4 py-6">
                 <Ionicons name="trending-up-outline" size={25} color={colors.muted} />
                 <Text className="mt-2 text-[10px] text-muted">রেফারেল অর্ডার বা কমিশনের তথ্য নেই।</Text>
               </View>
             ) : (
-              referralData?.orders.slice(0, 5).map((order) => {
+              referralData.orders.slice(0, 5).map((order) => {
                 const referredUser = typeof order.userId === 'object' ? order.userId : undefined;
                 return (
                   <View key={order._id} className="mb-2 rounded-xl border border-line bg-white p-3">

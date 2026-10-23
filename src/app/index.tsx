@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Animated, Image, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useAppSelector } from '../store/hooks';
 import { colors } from '../shared/theme/colors';
 
 export default function IndexRoute() {
-  const router = useRouter();
   const { isInitialized, isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [logoOpacity] = useState(() => new Animated.Value(0));
   const [logoScale] = useState(() => new Animated.Value(0.78));
@@ -48,16 +47,14 @@ export default function IndexRoute() {
     };
   }, [haloOpacity, logoOpacity, logoScale]);
 
-  useEffect(() => {
-    if (!isInitialized) return;
+  if (isInitialized) {
     const destination = isAuthenticated && user
       ? user.role?.toUpperCase() === 'DROPSHIPPING'
         ? '/(dropshipping)'
         : '/(ecommerce)/(tabs)'
       : '/(auth)/sign-in';
-    const timeout = setTimeout(() => router.replace(destination), 850);
-    return () => clearTimeout(timeout);
-  }, [isAuthenticated, isInitialized, router, user]);
+    return <Redirect href={destination} />;
+  }
 
   return (
     <View className="flex-1 items-center justify-center overflow-hidden bg-bg px-8">

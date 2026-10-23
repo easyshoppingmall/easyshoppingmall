@@ -1,5 +1,11 @@
 import { apiClient } from '../../../api/client';
 
+export function getDropshippingReferralLink(referralCode?: string): string | undefined {
+  return referralCode
+    ? `https://easyshoppingmallbd.com/signup?ref=${encodeURIComponent(referralCode)}`
+    : undefined;
+}
+
 export interface DropshippingOrderSummary {
   _id?: string;
   id?: string;

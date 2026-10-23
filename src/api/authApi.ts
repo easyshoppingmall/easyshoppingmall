@@ -114,16 +114,17 @@ export interface ReferralUser {
   email?: string;
   image?: string;
   createdAt?: string;
+  status?: string;
 }
 
 export interface ReferralOrder {
   _id: string;
   orderId?: string;
-  totalAmt?: number;
+  totalAmt?: number | string;
   order_status?: string;
   payment_status?: string;
-  referralBonusAmount?: number;
-  referralPercentage?: number;
+  referralBonusAmount?: number | string;
+  referralPercentage?: number | string;
   createdAt?: string;
   userId?: string | { _id?: string; name?: string; email?: string; image?: string };
 }
@@ -131,9 +132,9 @@ export interface ReferralOrder {
 export interface ProfileDashboard {
   user: UserProfile;
   referrals: {
-    count: number;
-    users: ReferralUser[];
-    orders: ReferralOrder[];
+    count?: number;
+    users?: ReferralUser[];
+    orders?: ReferralOrder[];
   };
 }
 
@@ -145,6 +146,66 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function parseReferralUsers(value: unknown): ReferralUser[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) {
+    throw new Error('সার্ভার থেকে রেফারেল সদস্যের সঠিক তালিকা পাওয়া যায়নি।');
+  }
+  return value.map((item) => {
+    const user = asRecord(item);
+    if (!user || typeof user._id !== 'string' || !user._id.trim()) {
+      throw new Error('সার্ভার থেকে রেফারেল সদস্যের সঠিক তথ্য পাওয়া যায়নি।');
+    }
+    return {
+      _id: user._id,
+      ...(typeof user.name === 'string' ? { name: user.name } : {}),
+      ...(typeof user.email === 'string' ? { email: user.email } : {}),
+      ...(typeof user.image === 'string' ? { image: user.image } : {}),
+      ...(typeof user.createdAt === 'string' ? { createdAt: user.createdAt } : {}),
+      ...(typeof user.status === 'string' ? { status: user.status } : {}),
+    };
+  });
+}
+
+function parseReferralOrders(value: unknown): ReferralOrder[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) {
+    throw new Error('সার্ভার থেকে রেফারেল অর্ডারের সঠিক তালিকা পাওয়া যায়নি।');
+  }
+  return value.map((item) => {
+    const order = asRecord(item);
+    if (!order || typeof order._id !== 'string' || !order._id.trim()) {
+      throw new Error('সার্ভার থেকে রেফারেল অর্ডারের সঠিক তথ্য পাওয়া যায়নি।');
+    }
+    const parsed: ReferralOrder = { _id: order._id };
+    for (const key of ['orderId', 'order_status', 'payment_status', 'createdAt'] as const) {
+      const field = order[key];
+      if (typeof field === 'string') parsed[key] = field;
+    }
+    for (const key of ['totalAmt', 'referralBonusAmount', 'referralPercentage'] as const) {
+      const field = order[key];
+      if (typeof field === 'number' && Number.isFinite(field)) {
+        parsed[key] = field;
+      } else if (typeof field === 'string' && field.trim() && Number.isFinite(Number(field))) {
+        parsed[key] = field;
+      }
+    }
+    if (typeof order.userId === 'string') {
+      parsed.userId = order.userId;
+    } else if (order.userId !== undefined && order.userId !== null) {
+      const user = asRecord(order.userId);
+      if (!user) throw new Error('সার্ভার থেকে রেফারেল অর্ডারের সদস্যতথ্য সঠিক নয়।');
+      parsed.userId = {
+        ...(typeof user._id === 'string' ? { _id: user._id } : {}),
+        ...(typeof user.name === 'string' ? { name: user.name } : {}),
+        ...(typeof user.email === 'string' ? { email: user.email } : {}),
+        ...(typeof user.image === 'string' ? { image: user.image } : {}),
+      };
+    }
+    return parsed;
+  });
 }
 
 function normalizeToken(value: string): string {
@@ -380,12 +441,25 @@ export const authApi = {
       asRecord(body.referrals) ??
       asRecord(asRecord(body.data)?.referrals) ??
       {};
+    const referralCountValue = referralData.count;
+    const referralCount =
+      typeof referralCountValue === 'number'
+        ? referralCountValue
+        : typeof referralCountValue === 'string' && referralCountValue.trim()
+          ? Number(referralCountValue)
+          : undefined;
+    if (
+      referralCount !== undefined &&
+      (!Number.isFinite(referralCount) || referralCount < 0)
+    ) {
+      throw new Error('সার্ভার থেকে রেফারেল সদস্যের সঠিক সংখ্যা পাওয়া যায়নি।');
+    }
     return {
       user: profile,
       referrals: {
-        count: Number(referralData.count) || 0,
-        users: Array.isArray(referralData.users) ? referralData.users as ReferralUser[] : [],
-        orders: Array.isArray(referralData.orders) ? referralData.orders as ReferralOrder[] : [],
+        count: referralCount,
+        users: parseReferralUsers(referralData.users),
+        orders: parseReferralOrders(referralData.orders),
       },
     };
   },

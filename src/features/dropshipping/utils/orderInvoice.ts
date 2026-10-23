@@ -2,11 +2,11 @@ import { Image } from 'react-native';
 
 export interface DropshippingInvoiceItem {
   name: string;
+  variant?: string;
+  image?: string;
   quantity: string;
-  costPrice: string;
   sellingPrice: string;
   totalPrice: string;
-  profit: string;
 }
 
 export interface DropshippingInvoiceData {
@@ -21,14 +21,15 @@ export interface DropshippingInvoiceData {
   subtotal: string;
   deliveryCharge: string;
   total: string;
-  totalCost: string;
-  estimatedProfit: string;
   paid: string;
   codAmount: string;
+  courier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
   shopName: string;
   shopOwner: string;
   shopAddress: string;
-  shopWebsite: string;
+  shopWebsite?: string;
   shopLogo?: string;
   items: DropshippingInvoiceItem[];
 }
@@ -51,12 +52,15 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
   const logo = defaultLogo || '';
   const rows = invoice.items.map((item) => `
     <tr>
-      <td>${escapeHtml(item.name)}</td>
+      <td>
+        <div class="product">
+        ${item.image ? `<img class="product-image" src="${escapeHtml(item.image)}" />` : ''}
+        <span>${escapeHtml(item.name)}${item.variant ? `<small>${escapeHtml(item.variant)}</small>` : ''}</span>
+        </div>
+      </td>
       <td class="center">${escapeHtml(item.quantity)}</td>
-      <td class="right">${escapeHtml(item.costPrice)}</td>
       <td class="right">${escapeHtml(item.sellingPrice)}</td>
       <td class="right">${escapeHtml(item.totalPrice)}</td>
-      <td class="right">${escapeHtml(item.profit)}</td>
     </tr>
   `).join('');
 
@@ -80,6 +84,9 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border-bottom: 1px solid #E3EAF1; padding: 10px 6px; text-align: left; }
         th { color: #64748B; font-size: 10px; }
+        .product { display: flex; align-items: center; gap: 8px; }
+        .product-image { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; }
+        small { display: block; margin-top: 3px; color: #64748B; }
         .center { text-align: center; }
         .right { text-align: right; }
         .total { color: #0077C2; font-size: 15px; font-weight: 700; }
@@ -101,6 +108,9 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
         <div class="row"><span class="label">তারিখ</span><span class="value">${escapeHtml(invoice.orderDate)}</span></div>
         <div class="row"><span class="label">অর্ডারের অবস্থা</span><span class="value">${escapeHtml(invoice.orderStatus)}</span></div>
         <div class="row"><span class="label">পেমেন্টের অবস্থা</span><span class="value">${escapeHtml(invoice.paymentStatus)}</span></div>
+        ${invoice.courier ? `<div class="row"><span class="label">কুরিয়ার</span><span class="value">${escapeHtml(invoice.courier)}</span></div>` : ''}
+        ${invoice.trackingNumber ? `<div class="row"><span class="label">ট্র্যাকিং নম্বর</span><span class="value">${escapeHtml(invoice.trackingNumber)}</span></div>` : ''}
+        ${invoice.trackingUrl ? `<div class="row"><span class="label">ট্র্যাকিং লিংক</span><span class="value">${escapeHtml(invoice.trackingUrl)}</span></div>` : ''}
       </section>
       <section class="box">
         <strong>ড্রপশিপার / শপ</strong>
@@ -119,16 +129,14 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
       <section class="box">
         <strong>পণ্যের বিবরণ</strong>
         <table>
-          <thead><tr><th>পণ্য</th><th class="center">পরিমাণ</th><th class="right">ক্রয়মূল্য</th><th class="right">বিক্রয়মূল্য</th><th class="right">সর্বমোট</th><th class="right">লাভ</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="6">পণ্যের তথ্য পাওয়া যায়নি।</td></tr>'}</tbody>
+          <thead><tr><th>পণ্য</th><th class="center">পরিমাণ</th><th class="right">একক মূল্য</th><th class="right">সর্বমোট</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4">পণ্যের তথ্য পাওয়া যায়নি।</td></tr>'}</tbody>
         </table>
       </section>
       <section class="box">
         <div class="row"><span class="label">সাবটোটাল</span><span class="value">${escapeHtml(invoice.subtotal)}</span></div>
         <div class="row"><span class="label">ডেলিভারি চার্জ</span><span class="value">${escapeHtml(invoice.deliveryCharge)}</span></div>
         <div class="row total"><span>সর্বমোট</span><span>${escapeHtml(invoice.total)}</span></div>
-        <div class="row"><span class="label">মোট পণ্যের ক্রয়মূল্য</span><span class="value">${escapeHtml(invoice.totalCost)}</span></div>
-        <div class="row"><span class="label">সম্ভাব্য লাভ</span><span class="value">${escapeHtml(invoice.estimatedProfit)}</span></div>
         <div class="row"><span class="label">পরিশোধিত</span><span class="value">${escapeHtml(invoice.paid)}</span></div>
         <div class="row"><span class="label">ক্যাশ অন ডেলিভারি</span><span class="value">${escapeHtml(invoice.codAmount)}</span></div>
         <div class="row"><span class="label">পেমেন্ট মাধ্যম</span><span class="value">${escapeHtml(invoice.paymentMethod)}</span></div>

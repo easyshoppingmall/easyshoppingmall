@@ -181,6 +181,24 @@ function productImage(item: Record<string, unknown>, product: Record<string, unk
   return Array.isArray(value) ? text(value[0]) : text(value);
 }
 
+function productVariant(item: Record<string, unknown>): string {
+  const variant = asRecord(item.variant);
+  return [
+    text(item.size ?? variant.size),
+    text(item.color ?? variant.color),
+    text(item.weight ?? variant.weight),
+  ].filter(Boolean).join(' · ');
+}
+
+function sortEvents(events: Record<string, unknown>[]): Record<string, unknown>[] {
+  const timestamp = (event: Record<string, unknown>) => {
+    const value = event.createdAt ?? event.created_at ?? event.updatedAt ?? event.date ?? event.timestamp;
+    const parsed = new Date(String(value ?? '')).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return [...events].sort((left, right) => timestamp(right) - timestamp(left));
+}
+
 function ItemCard({ item, index }: { item: Record<string, unknown>; index: number }) {
   const product = nestedProduct(item);
   const quantity = amount(item.quantity);
@@ -206,6 +224,9 @@ function ItemCard({ item, index }: { item: Record<string, unknown>; index: numbe
         <Text numberOfLines={2} className="text-[11px] font-bold leading-4 text-ink">
           {productName(item, product)}
         </Text>
+        {productVariant(item) ? (
+          <Text className="mt-1 text-[9px] text-muted">{productVariant(item)}</Text>
+        ) : null}
         <Text className="mt-1 text-[9px] text-muted">
           {quantity === undefined ? 'পরিমাণ: তথ্য নেই' : `পরিমাণ: ${formatDropshippingNumber(quantity)}`}
         </Text>
@@ -367,6 +388,9 @@ export function DropshippingOrderDetailsScreen() {
   const tracking = asRecord(order.tracking);
   const trackingNumber = text(order.trackingNumber ?? order.tracking_number ?? tracking.number ?? tracking.trackingNumber);
   const trackingUrl = text(order.trackingUrl ?? order.tracking_url ?? tracking.url);
+  const courier = text(
+    order.courier ?? order.courierName ?? order.shippingProvider ?? order.provider ?? tracking.courier
+  );
   const notes = text(order.notes ?? order.note ?? order.orderNotes ?? order.order_notes);
   const historyValues = Array.isArray(order.statusHistory)
     ? order.statusHistory
@@ -375,23 +399,13 @@ export function DropshippingOrderDetailsScreen() {
       : Array.isArray(order.order_status_history)
         ? order.order_status_history
         : [];
-  const timeline = historyValues.map(asRecord);
+  const timeline = sortEvents(historyValues.map(asRecord));
   const messageValues = Array.isArray(order.messages) ? order.messages : [];
-  const messages = messageValues.flatMap((value) => {
+  const messages = sortEvents(messageValues.flatMap((value) => {
     const message = asRecord(value);
     if (Object.keys(message).length) return [message];
     return typeof value === 'string' && value.trim() ? [{ message: value.trim() }] : [];
-  });
-  const activities: { type: 'status' | 'message'; data: Record<string, unknown> }[] = [
-    ...timeline.map((data) => ({ type: 'status' as const, data })),
-    ...messages.map((data) => ({ type: 'message' as const, data })),
-  ].sort((left, right) => {
-    const dateValue = (record: Record<string, unknown>) =>
-      record.createdAt ?? record.created_at ?? record.updatedAt ?? record.date ?? record.timestamp;
-    const leftTime = new Date(String(dateValue(left.data) ?? '')).getTime();
-    const rightTime = new Date(String(dateValue(right.data) ?? '')).getTime();
-    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
-  });
+  }));
   const highlightValues = order.keypoints ?? order.keyPoints;
   const highlights = Array.isArray(highlightValues)
     ? highlightValues.flatMap((value) => {
@@ -413,33 +427,26 @@ export function DropshippingOrderDetailsScreen() {
     dueAmount > 0 &&
     paidAmount === 0 &&
     !['paid', 'refunded'].includes(normalizedStatus(paymentStatus));
-  const profileName = text(profile?.name ?? sessionUser?.name) || 'EasyShoppingMallBD';
-  const shopName = text(profile?.shopName ?? profile?.facebookPage) || 'EasyShoppingMallBD';
+  const profileName = text(profile?.name ?? sessionUser?.name);
+  const shopName = text(profile?.shopName ?? profile?.facebookPage);
   const shopLogo = text(profile?.shopLogo ?? profile?.image);
   const shopAddress = text(profile?.shopAddress);
-  const shopWebsite = text(profile?.shopWebsite) || 'https://easyshoppingmallbd.com';
+  const shopWebsite = text(profile?.shopWebsite);
   const subtotalValue = subtotal ?? calculatedSubtotal;
-  const paymentType = normalizedStatus(order.payment_type);
-  const paymentMethodValue = normalizedStatus(order.payment_method ?? order.paymentMethod);
-  const codAmount = amount(order.codAmount ?? order.cod_amount) ??
-    (paymentType === 'delivery' || paymentMethodValue === 'cod' ? dueAmount : undefined);
+  const codAmount = amount(order.codAmount ?? order.cod_amount);
   const invoiceItems = items.map((item) => {
     const product = nestedProduct(item);
     const quantity = amount(item.quantity);
-    const cost = lineCost(item, product);
     const price = linePrice(item, product);
     const total = amount(item.totalPrice ?? item.total_price) ??
       (price !== undefined && quantity !== undefined ? price * quantity : undefined);
-    const lineProfit = cost !== undefined && price !== undefined && quantity !== undefined
-      ? (price - cost) * quantity
-      : undefined;
     return {
       name: productName(item, product),
+      variant: productVariant(item) || undefined,
+      image: productImage(item, product) || undefined,
       quantity: quantity === undefined ? '—' : formatDropshippingNumber(quantity),
-      costPrice: displayAmount(cost),
       sellingPrice: displayAmount(price),
       totalPrice: displayAmount(total),
-      profit: displayAmount(lineProfit),
     };
   });
 
@@ -459,14 +466,15 @@ export function DropshippingOrderDetailsScreen() {
         subtotal: displayAmount(subtotalValue),
         deliveryCharge: displayAmount(deliveryCharge),
         total: displayAmount(totalSale),
-        totalCost: displayAmount(totalProductCost),
-        estimatedProfit: displayAmount(estimatedProfit),
         paid: displayAmount(paidAmount),
         codAmount: displayAmount(codAmount),
-        shopName,
-        shopOwner: profileName,
+        courier: courier || undefined,
+        trackingNumber: trackingNumber || undefined,
+        trackingUrl: trackingUrl || undefined,
+        shopName: shopName || 'তথ্য নেই',
+        shopOwner: profileName || 'তথ্য নেই',
         shopAddress,
-        shopWebsite,
+        shopWebsite: shopWebsite || undefined,
         shopLogo: shopLogo || undefined,
         items: invoiceItems,
       });
@@ -616,18 +624,22 @@ export function DropshippingOrderDetailsScreen() {
         <Section title="ড্রপশিপার ও শপ" icon="storefront-outline">
           <View className="flex-row items-center">
             <View className="mr-3 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-primary-light">
-              <Image
-                source={shopLogo ? { uri: shopLogo } : require('../../../../assets/logo.png')}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                style={{ width: '100%', height: '100%' }}
-              />
+              {shopLogo ? (
+                <Image
+                  source={{ uri: shopLogo }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              ) : (
+                <Ionicons name="storefront-outline" size={23} color={colors.primary} />
+              )}
             </View>
             <View className="flex-1">
-              <Text className="text-[12px] font-extrabold text-ink">{shopName}</Text>
-              <Text className="mt-1 text-[10px] text-muted">{profileName}</Text>
+              <Text className="text-[12px] font-extrabold text-ink">{shopName || 'তথ্য নেই'}</Text>
+              <Text className="mt-1 text-[10px] text-muted">{profileName || 'তথ্য নেই'}</Text>
               {shopAddress ? <Text className="mt-1 text-[9px] text-muted">{shopAddress}</Text> : null}
-              <Text className="mt-1 text-[9px] text-primary">{shopWebsite}</Text>
+              {shopWebsite ? <Text className="mt-1 text-[9px] text-primary">{shopWebsite}</Text> : null}
             </View>
           </View>
           <View className="mt-3 border-t border-line pt-3">
@@ -687,55 +699,54 @@ export function DropshippingOrderDetailsScreen() {
         <Section title="পেমেন্টের তথ্য" icon="card-outline">
           <DetailRow label="পেমেন্ট মাধ্যম" value={paymentMethod} />
           <DetailRow label="পেমেন্টের অবস্থা" value={statusLabel(paymentStatus)} />
+          <DetailRow label="পরিশোধিত পরিমাণ" value={displayAmount(paidAmount)} />
+          <DetailRow label="ক্যাশ অন ডেলিভারি" value={displayAmount(codAmount)} />
           {text(order.payment_type) ? <DetailRow label="পেমেন্টের ধরন" value={text(order.payment_type) === 'full' ? 'সম্পূর্ণ পেমেন্ট' : text(order.payment_type) === 'delivery' ? 'ডেলিভারি চার্জ' : 'তথ্য নেই'} /> : null}
           {text(paymentInfo.provider) ? <DetailRow label="সেবা প্রদানকারী" value={paymentMethodLabel(paymentInfo.provider)} /> : null}
         </Section>
 
-        {highlights.length ? (
-          <Section title="গুরুত্বপূর্ণ তথ্য" icon="sparkles-outline">
-            {highlights.map((highlight, index) => (
+        <Section title="গুরুত্বপূর্ণ তথ্য" icon="sparkles-outline">
+          {highlights.length ? (
+            highlights.map((highlight, index) => (
               <View key={`${highlight}-${index}`} className="mb-2 flex-row items-start">
                 <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
                 <Text className="ml-2 flex-1 text-[10px] leading-4 text-ink">{highlight}</Text>
               </View>
-            ))}
-          </Section>
-        ) : null}
+            ))
+          ) : (
+            <Text className="text-[10px] leading-4 text-muted">
+              এই অর্ডারের জন্য কোনো গুরুত্বপূর্ণ তথ্য API-তে নেই।
+            </Text>
+          )}
+        </Section>
 
-        <Section title="অর্ডার আপডেট ও বার্তা" icon="time-outline">
-          {activities.length ? activities.map((activity, index) => {
-            const event = activity.data;
-            const isMessage = activity.type === 'message';
+        <Section title="স্ট্যাটাস হিস্ট্রি" icon="time-outline">
+          {timeline.length ? timeline.map((event, index) => {
             const oldStatus = text(event.fromStatus ?? event.previousStatus ?? event.oldStatus);
             const newStatus = event.toStatus ?? event.newStatus ?? event.status ?? event.order_status;
             const messageText = text(event.message ?? event.text ?? event.content ?? event.note);
-            const sender = text(
-              event.senderName ?? event.sender ?? event.userName ?? event.actorName ?? event.role
-            );
             const createdAt = dateLabel(
               event.createdAt ?? event.created_at ?? event.updatedAt ?? event.date ?? event.timestamp
             );
             return (
-            <View key={text(event._id ?? event.id) || `${activity.type}-${index}`} className="flex-row">
+            <View key={text(event._id ?? event.id) || `status-${index}`} className="flex-row">
               <View className="mr-3 items-center">
-                <View className={`h-3 w-3 rounded-full ${index === 0 ? 'bg-primary' : isMessage ? 'bg-orange-400' : 'bg-emerald-500'}`} />
-                {index < activities.length - 1 ? <View className="my-1 h-8 w-px bg-line" /> : null}
+                <View className={`h-3 w-3 rounded-full ${index === 0 ? 'bg-primary' : 'bg-emerald-500'}`} />
+                {index < timeline.length - 1 ? <View className="my-1 h-8 w-px bg-line" /> : null}
               </View>
               <View className="flex-1 pb-3">
                 <Text className="text-[10px] font-bold text-ink">
-                  {isMessage
-                    ? sender || 'বার্তা'
-                    : oldStatus
+                  {oldStatus
                     ? `${statusLabel(event.fromStatus ?? event.previousStatus)} → `
                     : ''}
-                  {!isMessage ? statusLabel(newStatus) : null}
+                  {statusLabel(newStatus)}
                 </Text>
                 {createdAt ? (
                   <Text className="mt-1 text-[9px] text-muted">
                     {createdAt}
                   </Text>
                 ) : null}
-                {!isMessage && text(event.changedByName ?? event.actorName ?? event.role) ? (
+                {text(event.changedByName ?? event.actorName ?? event.role) ? (
                   <Text className="mt-1 text-[9px] text-muted">
                     {text(event.changedByName ?? event.actorName ?? event.role)}
                   </Text>
@@ -746,15 +757,48 @@ export function DropshippingOrderDetailsScreen() {
               </View>
             </View>
           )}) : null}
-          {!activities.length ? (
+          {!timeline.length ? (
             <Text className="text-[10px] leading-4 text-muted">
-              এই অর্ডারের আপডেট বা বার্তার তথ্য API থেকে পাওয়া যায়নি।
+              এই অর্ডারের স্ট্যাটাস হিস্ট্রি API থেকে পাওয়া যায়নি।
             </Text>
           ) : null}
         </Section>
 
-        {trackingNumber || trackingUrl ? (
+        <Section title="অর্ডার আপডেট ও বার্তা" icon="chatbubbles-outline">
+          {messages.length ? messages.map((message, index) => {
+            const messageText = text(message.message ?? message.text ?? message.content ?? message.note);
+            const sender = text(
+              message.senderName ?? message.sender ?? message.userName ?? message.actorName ?? message.role
+            );
+            const createdAt = dateLabel(
+              message.createdAt ?? message.created_at ?? message.updatedAt ?? message.date ?? message.timestamp
+            );
+            return (
+              <View
+                key={text(message._id ?? message.id) || `message-${index}`}
+                className={`py-3 ${index ? 'border-t border-line' : ''}`}
+              >
+                <View className="flex-row items-center justify-between">
+                  <Text className="mr-2 flex-1 text-[10px] font-bold text-ink">
+                    {sender || 'বার্তা'}
+                  </Text>
+                  {createdAt ? <Text className="text-[9px] text-muted">{createdAt}</Text> : null}
+                </View>
+                {messageText ? (
+                  <Text className="mt-2 text-[10px] leading-4 text-muted">{messageText}</Text>
+                ) : null}
+              </View>
+            );
+          }) : (
+            <Text className="text-[10px] leading-4 text-muted">
+              এই অর্ডারের কোনো বার্তা API থেকে পাওয়া যায়নি।
+            </Text>
+          )}
+        </Section>
+
+        {courier || trackingNumber || trackingUrl ? (
           <Section title="ট্র্যাকিং তথ্য" icon="navigate-outline">
+            {courier ? <DetailRow label="কুরিয়ার / শিপিং প্রদানকারী" value={courier} /> : null}
             {trackingNumber ? <DetailRow label="ট্র্যাকিং নম্বর" value={trackingNumber} /> : null}
             {trackingUrl ? <DetailRow label="ট্র্যাকিং লিংক" value={trackingUrl} /> : null}
           </Section>

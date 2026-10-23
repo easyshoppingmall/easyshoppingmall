@@ -97,12 +97,12 @@ export function useDropshippingOrderDetailsQuery(orderId: string) {
   });
 }
 
-export function useDropshippingProfileQuery() {
+export function useDropshippingProfileQuery(enabled = true) {
   const userId = useAppSelector((state) => state.auth.user?._id);
   return useQuery({
     queryKey: dropshippingHomeQueryKeys.profile(userId ?? ''),
     queryFn: ({ signal }) => getDropshippingProfile(signal),
-    enabled: Boolean(userId),
+    enabled: Boolean(userId && enabled),
     staleTime: 60_000,
   });
 }

@@ -18,6 +18,7 @@ import {
 } from './DropshippingWorkspaceScreens';
 import { DropshippingSellerDashboardScreen } from './DropshippingSellerDashboardScreen';
 import { DropshippingMyAnalyticsScreen } from './DropshippingMyAnalyticsScreen';
+import { DropshippingTeamSystemScreen } from './DropshippingTeamSystemScreen';
 
 const SECTIONS: Record<
   string,
@@ -131,10 +132,11 @@ export function DropshippingSectionScreen() {
 function DropshippingSectionContent({ section }: { section?: string }) {
   const router = useRouter();
   const details = section ? SECTIONS[section] : undefined;
-  const profileQuery = useDropshippingProfileQuery();
+  const profileQuery = useDropshippingProfileQuery(section === 'balance');
   const profile = profileQuery.data;
 
   if (section === 'search-products') return <DropshippingSearchScreen />;
+  if (section === 'team-system') return <DropshippingTeamSystemScreen />;
   if (section === 'shop-settings') return <DropshippingShopSettingsScreen />;
   if (section === 'account' || section === 'referral-profile') {
     return <DropshippingProfileScreen />;
