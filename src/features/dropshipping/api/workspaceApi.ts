@@ -231,6 +231,7 @@ export interface CreateDropshippingPaymentRequestPayload {
   amount: number;
   paymentMethod: string;
   accountNumber: string;
+  number: string;
 }
 
 export async function createDropshippingPaymentRequest(

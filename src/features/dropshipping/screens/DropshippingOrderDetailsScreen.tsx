@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from 'react';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -125,7 +126,46 @@ function statusLabel(value: unknown): string {
     refunded: 'ফেরত',
     partial: 'আংশিক পরিশোধিত',
   };
-  return labels[status] ?? (status ? 'অন্যান্য' : 'তথ্য নেই');
+  return labels[status] ?? (text(value) || 'তথ্য নেই');
+}
+
+function statusTone(value: unknown): { backgroundColor: string; color: string } {
+  const status = normalizedStatus(value);
+  if (['completed', 'delivered', 'paid'].includes(status)) {
+    return { backgroundColor: '#EAF7EE', color: '#16804A' };
+  }
+  if (['cancelled', 'canceled', 'failed', 'refunded', 'returned', 'return', 'return_requested'].includes(status)) {
+    return { backgroundColor: '#FDECEF', color: '#C43D48' };
+  }
+  if (['shipped', 'dispatched', 'processing', 'submitted'].includes(status)) {
+    return { backgroundColor: '#E5F4FD', color: '#0077C2' };
+  }
+  return { backgroundColor: '#FFF7E5', color: '#A76500' };
+}
+
+function orderStatusMessage(value: unknown): string {
+  const messages: Record<string, string> = {
+    pending: 'আপনার অর্ডারটি গ্রহণ করা হয়েছে। প্রসেসিং শুরু হলে এখানে আপডেট পাবেন।',
+    processing: 'আপনার অর্ডারটি প্রস্তুত করা হচ্ছে। পরবর্তী আপডেট এখানে দেখুন।',
+    shipped: 'আপনার অর্ডারটি পাঠানো হয়েছে। ডেলিভারি আপডেটের জন্য অপেক্ষা করুন।',
+    dispatched: 'আপনার অর্ডারটি পাঠানো হয়েছে। ডেলিভারি আপডেটের জন্য অপেক্ষা করুন।',
+    delivered: 'আপনার অর্ডারটি ডেলিভারি সম্পন্ন হয়েছে। কেনাকাটার জন্য ধন্যবাদ।',
+    completed: 'আপনার অর্ডারটি সম্পন্ন হয়েছে। কেনাকাটার জন্য ধন্যবাদ।',
+    cancelled: 'এই অর্ডারটি বাতিল করা হয়েছে। প্রয়োজনে সহায়তার জন্য যোগাযোগ করুন।',
+    canceled: 'এই অর্ডারটি বাতিল করা হয়েছে। প্রয়োজনে সহায়তার জন্য যোগাযোগ করুন।',
+    return: 'এই অর্ডারের রিটার্ন প্রক্রিয়া চলছে। আপডেট এখানে দেখুন।',
+    returned: 'এই অর্ডারের রিটার্ন সম্পন্ন হয়েছে।',
+    return_requested: 'আপনার রিটার্ন অনুরোধটি গ্রহণ করা হয়েছে।',
+  };
+  return messages[normalizedStatus(value)] ?? 'আপনার অর্ডারের সর্বশেষ তথ্য নিচে দেখুন।';
+}
+
+function paymentTypeLabel(value: unknown): string {
+  const type = normalizedStatus(value);
+  if (type === 'full') return 'সম্পূর্ণ পেমেন্ট';
+  if (type === 'delivery') return 'ডেলিভারি চার্জ';
+  if (type === 'cod') return 'ক্যাশ অন ডেলিভারি';
+  return text(value) || 'তথ্য নেই';
 }
 
 function paymentMethodLabel(value: unknown): string {
@@ -138,7 +178,7 @@ function paymentMethodLabel(value: unknown): string {
     rocket: 'রকেট',
     upay: 'উপায়',
   };
-  return labels[method] ?? 'তথ্য নেই';
+  return labels[method] ?? (text(value) || 'তথ্য নেই');
 }
 
 function Section({
@@ -190,6 +230,11 @@ function productVariant(item: Record<string, unknown>): string {
   ].filter(Boolean).join(' · ');
 }
 
+function productSku(item: Record<string, unknown>, product: Record<string, unknown>): string {
+  return text(item.sku ?? item.productSku ?? item.productCode ?? item.code ??
+    product.sku ?? product.productSku ?? product.productCode ?? product.code);
+}
+
 function sortEvents(events: Record<string, unknown>[]): Record<string, unknown>[] {
   const timestamp = (event: Record<string, unknown>) => {
     const value = event.createdAt ?? event.created_at ?? event.updatedAt ?? event.date ?? event.timestamp;
@@ -212,7 +257,7 @@ function ItemCard({ item, index }: { item: Record<string, unknown>; index: numbe
   const image = productImage(item, product);
 
   return (
-    <View className={`flex-row py-3 ${index ? 'border-t border-line' : ''}`}>
+    <View className={`flex-row rounded-xl border border-line bg-white p-3 ${index ? 'mt-2' : ''}`}>
       <View className="mr-3 h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-xl bg-primary-light">
         {image ? (
           <Image source={{ uri: image }} contentFit="cover" cachePolicy="memory-disk" style={{ width: '100%', height: '100%' }} />
@@ -224,6 +269,9 @@ function ItemCard({ item, index }: { item: Record<string, unknown>; index: numbe
         <Text numberOfLines={2} className="text-[11px] font-bold leading-4 text-ink">
           {productName(item, product)}
         </Text>
+        {productSku(item, product) ? (
+          <Text className="mt-1 text-[9px] text-muted">SKU: {productSku(item, product)}</Text>
+        ) : null}
         {productVariant(item) ? (
           <Text className="mt-1 text-[9px] text-muted">{productVariant(item)}</Text>
         ) : null}
@@ -254,6 +302,8 @@ export function DropshippingOrderDetailsScreen() {
   const [paymentNotice, setPaymentNotice] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
+  const [isOrderIdCopied, setIsOrderIdCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
   const paymentMutation = useMutation({
     mutationFn: () => submitDropshippingManualPayment(
       id,
@@ -340,18 +390,7 @@ export function DropshippingOrderDetailsScreen() {
   const deliveryCharge = amount(order.deliveryCharge ?? order.shippingCost);
   const discount = amount(order.couponDiscount ?? order.discountAmount);
   const extraCharge = amount(order.otherCharges ?? order.additionalCharge);
-  const itemSales = items.map((item) => {
-    const product = nestedProduct(item);
-    const price = linePrice(item, product);
-    const quantity = amount(item.quantity);
-    const explicitTotal = amount(item.totalPrice ?? item.total_price);
-    return explicitTotal ?? (price !== undefined && quantity !== undefined ? price * quantity : undefined);
-  });
-  const calculatedSubtotal = itemSales.every((value) => value !== undefined)
-    ? itemSales.reduce<number>((total, value) => total + (value ?? 0), 0)
-    : undefined;
-  const totalSale = amount(order.totalAmt ?? order.totalAmount ?? order.totalPrice) ??
-    (subtotal !== undefined ? subtotal + (deliveryCharge ?? 0) - (discount ?? 0) + (extraCharge ?? 0) : calculatedSubtotal);
+  const totalSale = amount(order.totalAmt ?? order.totalAmount ?? order.totalPrice);
   const costValues = items.map((item) => {
     const product = nestedProduct(item);
     const cost = lineCost(item, product);
@@ -415,8 +454,13 @@ export function DropshippingOrderDetailsScreen() {
         return label ? [label] : [];
       })
     : [];
-  const paymentMethod = paymentMethodLabel(
-    paymentInfo.provider ?? payment.provider ?? order.payment_method ?? order.paymentMethod
+  const paymentMethod = paymentMethodLabel(order.payment_method ?? order.paymentMethod);
+  const orderProviderLabel = paymentMethodLabel(
+    paymentInfo.provider ?? payment.provider
+  );
+  const paymentType = paymentTypeLabel(order.payment_type ?? order.paymentType);
+  const paymentTransactionId = text(
+    paymentInfo.transactionId ?? payment.transactionId ?? order.transactionId
   );
   const dueAmount = amount(order.amount_due ?? order.amountDue ?? order.dueAmount);
   const paidAmount = amount(order.amount_paid ?? order.amountPaid);
@@ -428,11 +472,11 @@ export function DropshippingOrderDetailsScreen() {
     paidAmount === 0 &&
     !['paid', 'refunded'].includes(normalizedStatus(paymentStatus));
   const profileName = text(profile?.name ?? sessionUser?.name);
+  const profileImage = text(profile?.image ?? sessionUser?.image);
   const shopName = text(profile?.shopName ?? profile?.facebookPage);
   const shopLogo = text(profile?.shopLogo ?? profile?.image);
   const shopAddress = text(profile?.shopAddress);
   const shopWebsite = text(profile?.shopWebsite);
-  const subtotalValue = subtotal ?? calculatedSubtotal;
   const codAmount = amount(order.codAmount ?? order.cod_amount);
   const invoiceItems = items.map((item) => {
     const product = nestedProduct(item);
@@ -443,6 +487,7 @@ export function DropshippingOrderDetailsScreen() {
     return {
       name: productName(item, product),
       variant: productVariant(item) || undefined,
+      sku: productSku(item, product) || undefined,
       image: productImage(item, product) || undefined,
       quantity: quantity === undefined ? '—' : formatDropshippingNumber(quantity),
       sellingPrice: displayAmount(price),
@@ -460,11 +505,15 @@ export function DropshippingOrderDetailsScreen() {
         orderStatus: statusLabel(status),
         paymentStatus: statusLabel(paymentStatus),
         paymentMethod,
+        paymentType,
+        provider: orderProviderLabel === 'তথ্য নেই' ? undefined : orderProviderLabel,
+        transactionId: paymentTransactionId || undefined,
         customerName: customerName || 'তথ্য নেই',
         customerPhone: customerPhone || 'তথ্য নেই',
         customerAddress: addressLines.join(', ') || 'তথ্য নেই',
-        subtotal: displayAmount(subtotalValue),
+        subtotal: displayAmount(subtotal),
         deliveryCharge: displayAmount(deliveryCharge),
+        discount: discount === undefined ? undefined : displayAmount(discount),
         total: displayAmount(totalSale),
         paid: displayAmount(paidAmount),
         codAmount: displayAmount(codAmount),
@@ -477,6 +526,7 @@ export function DropshippingOrderDetailsScreen() {
         shopWebsite: shopWebsite || undefined,
         shopLogo: shopLogo || undefined,
         items: invoiceItems,
+        customerMessage: orderStatusMessage(status),
       });
       if (Platform.OS === 'web') {
         await Print.printAsync({ html });
@@ -495,6 +545,17 @@ export function DropshippingOrderDetailsScreen() {
       setInvoiceError(error instanceof Error ? error.message : 'ইনভয়েস তৈরি করা যায়নি।');
     } finally {
       setIsDownloadingInvoice(false);
+    }
+  };
+
+  const copyOrderId = async () => {
+    setCopyError('');
+    try {
+      await Clipboard.setStringAsync(idLabel);
+      setIsOrderIdCopied(true);
+    } catch (error) {
+      setIsOrderIdCopied(false);
+      setCopyError(error instanceof Error ? error.message : 'অর্ডার আইডি কপি করা যায়নি।');
     }
   };
 
@@ -526,18 +587,98 @@ export function DropshippingOrderDetailsScreen() {
         contentContainerClassName="px-4 pb-8 pt-4"
         showsVerticalScrollIndicator={false}
       >
-        <View className="mb-3 rounded-2xl bg-primary p-4">
-          <Text className="text-[9px] font-semibold text-white/75">অর্ডার নম্বর</Text>
-          <Text selectable className="mt-1 text-[14px] font-extrabold text-white">{idLabel}</Text>
-          <Text className="mt-2 text-[9px] text-white/80">{date || 'তারিখ নেই'}</Text>
-          <View className="mt-3 flex-row">
-            <View className="mr-2 flex-1 rounded-xl bg-white/15 px-3 py-2">
-              <Text className="text-[8px] text-white/75">অর্ডারের অবস্থা</Text>
-              <Text className="mt-1 text-[10px] font-bold text-white">{statusLabel(status)}</Text>
+        <View
+          className="mb-3 overflow-hidden rounded-2xl border border-line bg-white"
+          style={{
+            shadowColor: '#12263A',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.07,
+            shadowRadius: 10,
+            elevation: 2,
+          }}
+        >
+          <View className="h-1 bg-primary" />
+          <View className="p-4">
+            <View className="flex-row items-center">
+              <View className="mr-3 h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary-light">
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                ) : (
+                  <Ionicons name="person-outline" size={22} color={colors.primary} />
+                )}
+              </View>
+              <View className="flex-1">
+                <Text className="text-[9px] font-semibold text-muted">স্বাগতম</Text>
+                <Text numberOfLines={1} className="mt-0.5 text-[13px] font-extrabold text-ink">
+                  {profileName || 'আপনার অ্যাকাউন্ট'}
+                </Text>
+                <Text className="mt-0.5 text-[9px] text-muted">
+                  {status ? `${statusLabel(status)} ইনভয়েস` : 'অর্ডার ইনভয়েস'}
+                </Text>
+              </View>
+              <View
+                className="max-w-[42%] rounded-full px-3 py-1.5"
+                style={{ backgroundColor: statusTone(status).backgroundColor }}
+              >
+                <Text
+                  numberOfLines={1}
+                  className="text-[9px] font-bold"
+                  style={{ color: statusTone(status).color }}
+                >
+                  {statusLabel(status)}
+                </Text>
+              </View>
             </View>
-            <View className="ml-2 flex-1 rounded-xl bg-white/15 px-3 py-2">
-              <Text className="text-[8px] text-white/75">পেমেন্টের অবস্থা</Text>
-              <Text className="mt-1 text-[10px] font-bold text-white">{statusLabel(paymentStatus)}</Text>
+
+            <View className="mt-4 border-t border-line pt-3">
+              <View className="flex-row items-start justify-between">
+                <View className="mr-2 flex-1">
+                  <Text className="text-[9px] font-semibold text-muted">অর্ডার আইডি</Text>
+                  <Text selectable className="mt-1 text-[12px] font-extrabold text-ink">
+                    {idLabel}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="অর্ডার আইডি কপি করুন"
+                  onPress={() => void copyOrderId()}
+                  className="ml-1 flex-row items-center rounded-lg bg-primary-light px-2.5 py-2"
+                >
+                  <Ionicons
+                    name={isOrderIdCopied ? 'checkmark-outline' : 'copy-outline'}
+                    size={13}
+                    color={colors.primaryDark}
+                  />
+                  <Text className="ml-1 text-[9px] font-bold text-primary-dark">
+                    {isOrderIdCopied ? 'কপি হয়েছে' : 'কপি'}
+                  </Text>
+                </Pressable>
+              </View>
+              {copyError ? (
+                <Text className="mt-1 text-[9px] text-red-700">{copyError}</Text>
+              ) : null}
+              <View className="mt-3 flex-row items-center justify-between">
+                <Text className="text-[9px] text-muted">{date || 'তারিখ নেই'}</Text>
+                <View
+                  className="rounded-full px-2.5 py-1"
+                  style={{ backgroundColor: statusTone(paymentStatus).backgroundColor }}
+                >
+                  <Text
+                    className="text-[8px] font-bold"
+                    style={{ color: statusTone(paymentStatus).color }}
+                  >
+                    পেমেন্ট: {statusLabel(paymentStatus)}
+                  </Text>
+                </View>
+              </View>
+              <Text className="mt-3 text-[10px] leading-4 text-muted">
+                {orderStatusMessage(status)}
+              </Text>
             </View>
           </View>
         </View>
@@ -662,13 +803,17 @@ export function DropshippingOrderDetailsScreen() {
           <DetailRow label="ঠিকানা" value={addressLines.join(', ')} />
         </Section>
 
-        <Section title="মূল্য ও লাভ" icon="wallet-outline">
-          <DetailRow label="মোট বিক্রয়মূল্য" value={displayAmount(totalSale)} />
-          <DetailRow label="পণ্যের ক্রয়মূল্য" value={displayAmount(totalProductCost)} />
-          {deliveryCharge !== undefined ? <DetailRow label="ডেলিভারি চার্জ" value={displayAmount(deliveryCharge)} /> : null}
-          {extraCharge !== undefined ? <DetailRow label="অন্যান্য চার্জ" value={displayAmount(extraCharge)} /> : null}
+        <Section title="অর্ডার সারাংশ ও মূল্য" icon="wallet-outline">
+          <DetailRow label="সাবটোটাল" value={displayAmount(subtotal)} />
+          <DetailRow label="ডেলিভারি চার্জ" value={displayAmount(deliveryCharge)} />
           {discount !== undefined ? <DetailRow label="ছাড়" value={displayAmount(discount)} /> : null}
+          {extraCharge !== undefined ? <DetailRow label="অন্যান্য চার্জ" value={displayAmount(extraCharge)} /> : null}
           <View className="my-1 h-px bg-line" />
+          <DetailRow label="মোট অর্ডার মূল্য" value={displayAmount(totalSale)} strong />
+          <DetailRow label="পরিশোধিত পরিমাণ" value={displayAmount(paidAmount)} />
+          <DetailRow label="ক্যাশ অন ডেলিভারি" value={displayAmount(codAmount)} />
+          <View className="my-1 h-px bg-line" />
+          <DetailRow label="পণ্যের ক্রয়মূল্য" value={displayAmount(totalProductCost)} />
           <DetailRow label="মোট খরচ" value={displayAmount(
             totalProductCost === undefined
               ? undefined
@@ -691,18 +836,17 @@ export function DropshippingOrderDetailsScreen() {
               <Ionicons name="download-outline" size={16} color={colors.primary} />
             )}
             <Text className="ml-2 text-[10px] font-bold text-primary">
-              {isDownloadingInvoice ? 'ইনভয়েস তৈরি হচ্ছে...' : 'ইনভয়েস ডাউনলোড করুন'}
+              {isDownloadingInvoice ? 'ইনভয়েস তৈরি হচ্ছে...' : 'ইনভয়েস PDF সংরক্ষণ / শেয়ার করুন'}
             </Text>
           </Pressable>
         </Section>
 
         <Section title="পেমেন্টের তথ্য" icon="card-outline">
           <DetailRow label="পেমেন্ট মাধ্যম" value={paymentMethod} />
+          <DetailRow label="পেমেন্টের ধরন" value={paymentType} />
           <DetailRow label="পেমেন্টের অবস্থা" value={statusLabel(paymentStatus)} />
-          <DetailRow label="পরিশোধিত পরিমাণ" value={displayAmount(paidAmount)} />
-          <DetailRow label="ক্যাশ অন ডেলিভারি" value={displayAmount(codAmount)} />
-          {text(order.payment_type) ? <DetailRow label="পেমেন্টের ধরন" value={text(order.payment_type) === 'full' ? 'সম্পূর্ণ পেমেন্ট' : text(order.payment_type) === 'delivery' ? 'ডেলিভারি চার্জ' : 'তথ্য নেই'} /> : null}
-          {text(paymentInfo.provider) ? <DetailRow label="সেবা প্রদানকারী" value={paymentMethodLabel(paymentInfo.provider)} /> : null}
+          <DetailRow label="সেবা প্রদানকারী" value={orderProviderLabel} />
+          <DetailRow label="ট্রানজেকশন আইডি" value={paymentTransactionId} />
         </Section>
 
         <Section title="গুরুত্বপূর্ণ তথ্য" icon="sparkles-outline">
@@ -809,6 +953,18 @@ export function DropshippingOrderDetailsScreen() {
             <Text className="text-[10px] leading-5 text-ink">{notes}</Text>
           </Section>
         ) : null}
+
+        <View className="mb-3 items-center rounded-2xl border border-line bg-white px-4 py-5">
+          <Ionicons name="heart-outline" size={19} color={colors.primary} />
+          <Text className="mt-2 text-center text-[11px] font-bold text-ink">
+            {customerName ? `ধন্যবাদ, ${customerName}!` : 'কেনাকাটার জন্য ধন্যবাদ!'}
+          </Text>
+          <Text className="mt-1 text-center text-[9px] leading-4 text-muted">
+            {orderStatusMessage(status)}
+          </Text>
+          <Text className="mt-3 text-[11px] font-extrabold text-primary">EasyShoppingMallBD</Text>
+          <Text className="mt-1 text-[8px] text-muted">আপনার বিশ্বস্ত শপিং পার্টনার</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

@@ -570,6 +570,10 @@ export function DropshippingPaymentRequestScreen() {
       setValidationError('সঠিক উত্তোলনের পরিমাণ লিখুন।');
       return;
     }
+    if (parsedAmount < 200) {
+      setValidationError('উত্তোলনের সর্বনিম্ন পরিমাণ ৳200।');
+      return;
+    }
     if (balance === undefined) {
       setValidationError('ব্যালেন্স যাচাই করা যাচ্ছে না। অনুগ্রহ করে আবার চেষ্টা করুন।');
       return;
@@ -590,6 +594,7 @@ export function DropshippingPaymentRequestScreen() {
       amount: parsedAmount,
       paymentMethod: activeMethod.key,
       accountNumber: destinationAccount.trim(),
+      number: destinationAccount.trim(),
     });
   };
 
@@ -619,6 +624,25 @@ export function DropshippingPaymentRequestScreen() {
             </Text>
           </View>
         )}
+        <View className="mb-4 rounded-2xl border border-[#F3D79A] bg-[#FFF9E9] p-4">
+          <View className="mb-2 flex-row items-center">
+            <Ionicons name="information-circle-outline" size={17} color="#A76500" />
+            <Text className="ml-2 text-[11px] font-extrabold text-[#805000]">
+              গুরুত্বপূর্ণ বিজ্ঞপ্তি
+            </Text>
+          </View>
+          {[
+            'ন্যূনতম উত্তোলনের পরিমাণ ৳200।',
+            'উত্তোলনের অনুরোধ 24–72 ঘণ্টার মধ্যে প্রক্রিয়া করা হয়।',
+            'জমা দেওয়ার আগে আপনার অ্যাকাউন্ট নম্বর দুবার পরীক্ষা করুন।',
+            'পেমেন্ট শুধুমাত্র যাচাইকৃত বিকাশ, নগদ, রকেট বা ব্যাংক অ্যাকাউন্টে পাঠানো হয়।',
+          ].map((notice, index) => (
+            <View key={notice} className={`flex-row items-start ${index < 3 ? 'mb-1.5' : ''}`}>
+              <View className="mr-2 mt-1 h-1.5 w-1.5 rounded-full bg-[#C18416]" />
+              <Text className="flex-1 text-[9px] leading-4 text-[#805000]">{notice}</Text>
+            </View>
+          ))}
+        </View>
         <View className="mb-4 rounded-2xl border border-line bg-white p-4">
           <View className="mb-3 flex-row items-center">
             <View className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl bg-primary-light">

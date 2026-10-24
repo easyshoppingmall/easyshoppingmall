@@ -3,6 +3,7 @@ import { Image } from 'react-native';
 export interface DropshippingInvoiceItem {
   name: string;
   variant?: string;
+  sku?: string;
   image?: string;
   quantity: string;
   sellingPrice: string;
@@ -15,11 +16,15 @@ export interface DropshippingInvoiceData {
   orderStatus: string;
   paymentStatus: string;
   paymentMethod: string;
+  paymentType?: string;
+  provider?: string;
+  transactionId?: string;
   customerName: string;
   customerPhone: string;
   customerAddress: string;
   subtotal: string;
   deliveryCharge: string;
+  discount?: string;
   total: string;
   paid: string;
   codAmount: string;
@@ -32,6 +37,7 @@ export interface DropshippingInvoiceData {
   shopWebsite?: string;
   shopLogo?: string;
   items: DropshippingInvoiceItem[];
+  customerMessage: string;
 }
 
 function escapeHtml(value: string): string {
@@ -55,7 +61,10 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
       <td>
         <div class="product">
         ${item.image ? `<img class="product-image" src="${escapeHtml(item.image)}" />` : ''}
-        <span>${escapeHtml(item.name)}${item.variant ? `<small>${escapeHtml(item.variant)}</small>` : ''}</span>
+        <span class="product-name">${escapeHtml(item.name)}
+          ${item.sku ? `<small>SKU: ${escapeHtml(item.sku)}</small>` : ''}
+          ${item.variant ? `<small>${escapeHtml(item.variant)}</small>` : ''}
+        </span>
         </div>
       </td>
       <td class="center">${escapeHtml(item.quantity)}</td>
@@ -76,21 +85,33 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
         .logo { width: 54px; height: 54px; border-radius: 12px; object-fit: contain; }
         h1 { margin: 0; color: #0077C2; font-size: 19px; }
         .muted { margin-top: 4px; color: #64748B; font-size: 11px; }
-        .title { margin: 22px 0 12px; font-size: 18px; }
+        .title-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 20px 0 12px; }
+        .title { margin: 0; font-size: 18px; }
+        .badge { padding: 6px 10px; border-radius: 99px; background: #E5F4FD; color: #0077C2; font-size: 10px; font-weight: 700; }
         .box { margin: 12px 0; padding: 14px; border: 1px solid #E3EAF1; border-radius: 12px; }
         .row { display: flex; justify-content: space-between; gap: 20px; margin: 8px 0; }
         .label { color: #64748B; }
-        .value { text-align: right; font-weight: 600; }
+        .value { min-width: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border-bottom: 1px solid #E3EAF1; padding: 10px 6px; text-align: left; }
         th { color: #64748B; font-size: 10px; }
         .product { display: flex; align-items: center; gap: 8px; }
         .product-image { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; }
-        small { display: block; margin-top: 3px; color: #64748B; }
+        .product-name { min-width: 0; overflow-wrap: anywhere; }
+        small { display: block; margin-top: 3px; color: #64748B; font-size: 9px; }
         .center { text-align: center; }
         .right { text-align: right; }
         .total { color: #0077C2; font-size: 15px; font-weight: 700; }
-        .footer { margin-top: 22px; color: #64748B; text-align: center; font-size: 10px; }
+        .thank-you { margin-top: 20px; padding: 16px; border-radius: 12px; background: #F4FAFE; text-align: center; }
+        .thank-you strong { color: #0077C2; }
+        .footer { margin-top: 12px; color: #64748B; text-align: center; font-size: 10px; }
+        @media (max-width: 600px) {
+          body { padding: 14px; font-size: 12px; }
+          .box { padding: 11px; }
+          th, td { padding: 8px 4px; font-size: 10px; }
+          .product-image { width: 32px; height: 32px; }
+          .product { gap: 5px; }
+        }
         @media print { body { padding: 10px; } }
       </style>
     </head>
@@ -102,12 +123,19 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
           <div class="muted">easyshoppingmallbd.com</div>
         </div>
       </header>
-      <h2 class="title">অর্ডার ইনভয়েস</h2>
+      <div class="title-row">
+        <h2 class="title">${escapeHtml(invoice.orderStatus === 'তথ্য নেই' ? 'অর্ডার' : invoice.orderStatus)} ইনভয়েস</h2>
+        <span class="badge">${escapeHtml(invoice.paymentStatus)}</span>
+      </div>
       <section class="box">
         <div class="row"><span class="label">অর্ডার আইডি</span><span class="value">${escapeHtml(invoice.orderId)}</span></div>
         <div class="row"><span class="label">তারিখ</span><span class="value">${escapeHtml(invoice.orderDate)}</span></div>
         <div class="row"><span class="label">অর্ডারের অবস্থা</span><span class="value">${escapeHtml(invoice.orderStatus)}</span></div>
         <div class="row"><span class="label">পেমেন্টের অবস্থা</span><span class="value">${escapeHtml(invoice.paymentStatus)}</span></div>
+        ${invoice.paymentMethod ? `<div class="row"><span class="label">পেমেন্ট মাধ্যম</span><span class="value">${escapeHtml(invoice.paymentMethod)}</span></div>` : ''}
+        ${invoice.paymentType ? `<div class="row"><span class="label">পেমেন্টের ধরন</span><span class="value">${escapeHtml(invoice.paymentType)}</span></div>` : ''}
+        ${invoice.provider ? `<div class="row"><span class="label">সেবা প্রদানকারী</span><span class="value">${escapeHtml(invoice.provider)}</span></div>` : ''}
+        ${invoice.transactionId ? `<div class="row"><span class="label">ট্রানজেকশন আইডি</span><span class="value">${escapeHtml(invoice.transactionId)}</span></div>` : ''}
         ${invoice.courier ? `<div class="row"><span class="label">কুরিয়ার</span><span class="value">${escapeHtml(invoice.courier)}</span></div>` : ''}
         ${invoice.trackingNumber ? `<div class="row"><span class="label">ট্র্যাকিং নম্বর</span><span class="value">${escapeHtml(invoice.trackingNumber)}</span></div>` : ''}
         ${invoice.trackingUrl ? `<div class="row"><span class="label">ট্র্যাকিং লিংক</span><span class="value">${escapeHtml(invoice.trackingUrl)}</span></div>` : ''}
@@ -136,12 +164,16 @@ export function createDropshippingInvoiceHtml(invoice: DropshippingInvoiceData):
       <section class="box">
         <div class="row"><span class="label">সাবটোটাল</span><span class="value">${escapeHtml(invoice.subtotal)}</span></div>
         <div class="row"><span class="label">ডেলিভারি চার্জ</span><span class="value">${escapeHtml(invoice.deliveryCharge)}</span></div>
+        ${invoice.discount ? `<div class="row"><span class="label">ছাড়</span><span class="value">${escapeHtml(invoice.discount)}</span></div>` : ''}
         <div class="row total"><span>সর্বমোট</span><span>${escapeHtml(invoice.total)}</span></div>
         <div class="row"><span class="label">পরিশোধিত</span><span class="value">${escapeHtml(invoice.paid)}</span></div>
         <div class="row"><span class="label">ক্যাশ অন ডেলিভারি</span><span class="value">${escapeHtml(invoice.codAmount)}</span></div>
-        <div class="row"><span class="label">পেমেন্ট মাধ্যম</span><span class="value">${escapeHtml(invoice.paymentMethod)}</span></div>
       </section>
-      <footer class="footer">এই ইনভয়েস EasyShoppingMallBD অ্যাপ থেকে তৈরি করা হয়েছে।</footer>
+      <section class="thank-you">
+        <strong>${invoice.customerName !== 'তথ্য নেই' ? `ধন্যবাদ, ${escapeHtml(invoice.customerName)}!` : 'কেনাকাটার জন্য ধন্যবাদ!'}</strong>
+        <div class="muted">${escapeHtml(invoice.customerMessage)}</div>
+      </section>
+      <footer class="footer"><strong>EasyShoppingMallBD</strong> · এই ইনভয়েসটি অ্যাপ থেকে তৈরি করা হয়েছে।</footer>
     </body>
   </html>`;
 }
