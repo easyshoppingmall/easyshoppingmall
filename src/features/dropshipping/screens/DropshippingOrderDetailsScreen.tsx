@@ -57,7 +57,7 @@ function amount(value: unknown): number | undefined {
 }
 
 function dateLabel(value: unknown): string {
-  if (typeof value !== 'string' || !value) return '';
+  if ((typeof value !== 'string' && typeof value !== 'number') || value === '') return '';
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? ''
@@ -184,14 +184,25 @@ function paymentMethodLabel(value: unknown): string {
 function Section({
   title,
   icon,
+  elevated = false,
   children,
 }: {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
+  elevated?: boolean;
   children: ReactNode;
 }) {
   return (
-    <View className="mb-3 rounded-2xl border border-line bg-white p-4">
+    <View
+      className="mb-3 rounded-2xl border border-line bg-white p-4"
+      style={elevated ? {
+        shadowColor: '#12263A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+      } : undefined}
+    >
       <View className="mb-3 flex-row items-center">
         <Ionicons name={icon} size={18} color={colors.primary} />
         <Text className="ml-2 text-[13px] font-extrabold text-ink">{title}</Text>
@@ -237,11 +248,121 @@ function productSku(item: Record<string, unknown>, product: Record<string, unkno
 
 function sortEvents(events: Record<string, unknown>[]): Record<string, unknown>[] {
   const timestamp = (event: Record<string, unknown>) => {
-    const value = event.createdAt ?? event.created_at ?? event.updatedAt ?? event.date ?? event.timestamp;
+    const value = event.createdAt ?? event.created_at ?? event.updatedAt ??
+      event.updated_at ?? event.date ?? event.timestamp;
     const parsed = new Date(String(value ?? '')).getTime();
     return Number.isFinite(parsed) ? parsed : 0;
   };
   return [...events].sort((left, right) => timestamp(right) - timestamp(left));
+}
+
+function updateKind(event: Record<string, unknown>): 'message' | 'status' | undefined {
+  const type = text(event.type ?? event.updateType ?? event.eventType ?? event.action).toLowerCase();
+  const message = text(
+    event.message ?? event.adminMessage ?? event.messageText ?? event.text ?? event.content
+  );
+  if (type.includes('message') && message) return 'message';
+  const status = text(
+    event.status ?? event.orderStatus ?? event.order_status ?? event.newStatus ??
+      event.toStatus ?? event.statusUpdate ?? event.status_update
+  );
+  if (type.includes('status') && status) return 'status';
+  if (status) {
+    return 'status';
+  }
+  if (message) return 'message';
+  return undefined;
+}
+
+function updateTimestamp(event: Record<string, unknown>): string {
+  return dateLabel(
+    event.createdAt ?? event.created_at ?? event.updatedAt ?? event.updated_at ??
+      event.date ?? event.timestamp
+  );
+}
+
+function OrderUpdateCard({ event }: { event: Record<string, unknown> }) {
+  const kind = updateKind(event);
+  if (!kind) return null;
+
+  const isMessage = kind === 'message';
+  const status = text(
+    event.status ?? event.orderStatus ?? event.order_status ?? event.newStatus ??
+      event.toStatus ?? event.statusUpdate ?? event.status_update
+  );
+  const message = text(
+    event.message ?? event.adminMessage ?? event.messageText ?? event.text ?? event.content
+  );
+  const note = text(
+    event.statusNote ?? event.status_note ?? event.statusMessage ?? event.status_message ??
+      event.note ?? event.description
+  );
+  const trackingNumber = text(
+    event.trackingNumber ?? event.tracking_number ?? event.trackingNo ?? event.tracking_no ??
+      event.trackingId ?? event.tracking_id
+  );
+  const estimatedDelivery = text(
+    event.estimatedDeliveryDate ?? event.estimated_delivery_date ??
+      event.estimatedDelivery ?? event.estimated_delivery ?? event.estimatedDeliveryAt
+  );
+  const createdAt = updateTimestamp(event);
+  const statusLabelText = status.replace(/[_-]+/g, ' ').toUpperCase();
+
+  return (
+    <View
+      className={`mb-2 rounded-xl border p-3 ${
+        isMessage ? 'border-cyan-100 bg-cyan-50' : 'border-slate-200 bg-slate-50'
+      }`}
+    >
+      <View className="flex-row items-start justify-between">
+        <View
+          className={`max-w-[78%] rounded-full px-2.5 py-1 ${
+            isMessage ? 'bg-cyan-100' : 'bg-slate-200'
+          }`}
+        >
+          <Text
+            className={`text-[8px] font-extrabold ${
+              isMessage ? 'text-cyan-800' : 'text-slate-700'
+            }`}
+          >
+            {isMessage ? 'MESSAGE FROM ADMIN' : `STATUS: ${statusLabelText}`}
+          </Text>
+        </View>
+        {createdAt ? (
+          <Text className="ml-2 flex-1 text-right text-[8px] leading-4 text-muted">
+            {createdAt}
+          </Text>
+        ) : null}
+      </View>
+
+      {isMessage ? (
+        message ? (
+          <Text className="mt-2 text-[10px] leading-5 text-ink">{message}</Text>
+        ) : null
+      ) : (
+        <>
+          {note ? <Text className="mt-2 text-[10px] leading-5 text-ink">{note}</Text> : null}
+          {trackingNumber ? (
+            <View className="mt-2 rounded-lg bg-white/80 px-2.5 py-2">
+              <Text className="text-[8px] font-semibold text-muted">ট্র্যাকিং নম্বর</Text>
+              <Text selectable className="mt-0.5 text-[10px] font-bold text-ink">
+                {trackingNumber}
+              </Text>
+            </View>
+          ) : null}
+          {estimatedDelivery ? (
+            <View className="mt-2 rounded-lg bg-white/80 px-2.5 py-2">
+              <Text className="text-[8px] font-semibold text-muted">সম্ভাব্য ডেলিভারির তারিখ</Text>
+              <Text className="mt-0.5 text-[10px] font-bold text-ink">
+                {dateLabel(event.estimatedDeliveryDate ?? event.estimated_delivery_date ??
+                  event.estimatedDelivery ?? event.estimated_delivery ?? event.estimatedDeliveryAt) || estimatedDelivery}
+              </Text>
+            </View>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
 }
 
 function ItemCard({ item, index }: { item: Record<string, unknown>; index: number }) {
@@ -431,26 +552,17 @@ export function DropshippingOrderDetailsScreen() {
     order.courier ?? order.courierName ?? order.shippingProvider ?? order.provider ?? tracking.courier
   );
   const notes = text(order.notes ?? order.note ?? order.orderNotes ?? order.order_notes);
-  const historyValues = Array.isArray(order.statusHistory)
-    ? order.statusHistory
-    : Array.isArray(order.statusTimeline)
-      ? order.statusTimeline
-      : Array.isArray(order.order_status_history)
-        ? order.order_status_history
-        : [];
-  const timeline = sortEvents(historyValues.map(asRecord));
-  const messageValues = Array.isArray(order.messages) ? order.messages : [];
-  const messages = sortEvents(messageValues.flatMap((value) => {
-    const message = asRecord(value);
-    if (Object.keys(message).length) return [message];
-    return typeof value === 'string' && value.trim() ? [{ message: value.trim() }] : [];
-  }));
-  const highlightValues = order.keypoints ?? order.keyPoints;
+  const historyValues = Array.isArray(order.dropshippingStatusHistory)
+    ? order.dropshippingStatusHistory
+    : [];
+  const orderUpdates = sortEvents(historyValues.map(asRecord))
+    .filter((event) => updateKind(event) !== undefined);
+  const highlightValues = order.keyPoints;
   const highlights = Array.isArray(highlightValues)
     ? highlightValues.flatMap((value) => {
         if (typeof value === 'string' && value.trim()) return [value.trim()];
         const highlight = asRecord(value);
-        const label = text(highlight.title ?? highlight.text ?? highlight.message);
+        const label = text(highlight?.title ?? highlight?.text ?? highlight?.message);
         return label ? [label] : [];
       })
     : [];
@@ -849,96 +961,48 @@ export function DropshippingOrderDetailsScreen() {
           <DetailRow label="ট্রানজেকশন আইডি" value={paymentTransactionId} />
         </Section>
 
-        <Section title="গুরুত্বপূর্ণ তথ্য" icon="sparkles-outline">
-          {highlights.length ? (
-            highlights.map((highlight, index) => (
-              <View key={`${highlight}-${index}`} className="mb-2 flex-row items-start">
-                <Ionicons name="checkmark-circle" size={15} color={colors.primary} />
-                <Text className="ml-2 flex-1 text-[10px] leading-4 text-ink">{highlight}</Text>
-              </View>
-            ))
+        <Section title="Order Updates & Messages" icon="chatbubbles-outline" elevated>
+          {orderUpdates.length ? (
+            <ScrollView
+              nestedScrollEnabled
+              scrollEnabled={orderUpdates.length > 4}
+              showsVerticalScrollIndicator={false}
+              style={orderUpdates.length > 4 ? { maxHeight: 360 } : undefined}
+            >
+              {orderUpdates.map((event, index) => (
+                <OrderUpdateCard
+                  key={text(event._id ?? event.id) || `order-update-${index}`}
+                  event={event}
+                />
+              ))}
+            </ScrollView>
           ) : (
-            <Text className="text-[10px] leading-4 text-muted">
-              এই অর্ডারের জন্য কোনো গুরুত্বপূর্ণ তথ্য API-তে নেই।
-            </Text>
-          )}
-        </Section>
-
-        <Section title="স্ট্যাটাস হিস্ট্রি" icon="time-outline">
-          {timeline.length ? timeline.map((event, index) => {
-            const oldStatus = text(event.fromStatus ?? event.previousStatus ?? event.oldStatus);
-            const newStatus = event.toStatus ?? event.newStatus ?? event.status ?? event.order_status;
-            const messageText = text(event.message ?? event.text ?? event.content ?? event.note);
-            const createdAt = dateLabel(
-              event.createdAt ?? event.created_at ?? event.updatedAt ?? event.date ?? event.timestamp
-            );
-            return (
-            <View key={text(event._id ?? event.id) || `status-${index}`} className="flex-row">
-              <View className="mr-3 items-center">
-                <View className={`h-3 w-3 rounded-full ${index === 0 ? 'bg-primary' : 'bg-emerald-500'}`} />
-                {index < timeline.length - 1 ? <View className="my-1 h-8 w-px bg-line" /> : null}
-              </View>
-              <View className="flex-1 pb-3">
-                <Text className="text-[10px] font-bold text-ink">
-                  {oldStatus
-                    ? `${statusLabel(event.fromStatus ?? event.previousStatus)} → `
-                    : ''}
-                  {statusLabel(newStatus)}
-                </Text>
-                {createdAt ? (
-                  <Text className="mt-1 text-[9px] text-muted">
-                    {createdAt}
-                  </Text>
-                ) : null}
-                {text(event.changedByName ?? event.actorName ?? event.role) ? (
-                  <Text className="mt-1 text-[9px] text-muted">
-                    {text(event.changedByName ?? event.actorName ?? event.role)}
-                  </Text>
-                ) : null}
-                {messageText ? (
-                  <Text className="mt-1 text-[9px] leading-4 text-muted">{messageText}</Text>
-                ) : null}
-              </View>
+            <View className="items-center rounded-xl border border-dashed border-line bg-bg px-4 py-5">
+              <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.muted} />
+              <Text className="mt-2 text-center text-[10px] font-semibold text-muted">
+                এই অর্ডারের কোনো আপডেট বা বার্তা নেই।
+              </Text>
             </View>
-          )}) : null}
-          {!timeline.length ? (
-            <Text className="text-[10px] leading-4 text-muted">
-              এই অর্ডারের স্ট্যাটাস হিস্ট্রি API থেকে পাওয়া যায়নি।
-            </Text>
-          ) : null}
-        </Section>
-
-        <Section title="অর্ডার আপডেট ও বার্তা" icon="chatbubbles-outline">
-          {messages.length ? messages.map((message, index) => {
-            const messageText = text(message.message ?? message.text ?? message.content ?? message.note);
-            const sender = text(
-              message.senderName ?? message.sender ?? message.userName ?? message.actorName ?? message.role
-            );
-            const createdAt = dateLabel(
-              message.createdAt ?? message.created_at ?? message.updatedAt ?? message.date ?? message.timestamp
-            );
-            return (
-              <View
-                key={text(message._id ?? message.id) || `message-${index}`}
-                className={`py-3 ${index ? 'border-t border-line' : ''}`}
-              >
-                <View className="flex-row items-center justify-between">
-                  <Text className="mr-2 flex-1 text-[10px] font-bold text-ink">
-                    {sender || 'বার্তা'}
-                  </Text>
-                  {createdAt ? <Text className="text-[9px] text-muted">{createdAt}</Text> : null}
-                </View>
-                {messageText ? (
-                  <Text className="mt-2 text-[10px] leading-4 text-muted">{messageText}</Text>
-                ) : null}
-              </View>
-            );
-          }) : (
-            <Text className="text-[10px] leading-4 text-muted">
-              এই অর্ডারের কোনো বার্তা API থেকে পাওয়া যায়নি।
-            </Text>
           )}
         </Section>
+
+        {highlights.length ? (
+          <Section title="Key Highlights" icon="sparkles-outline" elevated>
+            <View className="flex-row flex-wrap">
+              {highlights.map((highlight, index) => (
+                <View
+                  key={`${highlight}-${index}`}
+                  className="mb-2 mr-2 max-w-full flex-row items-start rounded-full border border-primary/15 bg-primary-light px-3 py-2"
+                >
+                  <Ionicons name="checkmark-circle" size={13} color={colors.primary} />
+                  <Text className="ml-1.5 flex-shrink text-[9px] font-semibold leading-4 text-primary-dark">
+                    {highlight}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Section>
+        ) : null}
 
         {courier || trackingNumber || trackingUrl ? (
           <Section title="ট্র্যাকিং তথ্য" icon="navigate-outline">
