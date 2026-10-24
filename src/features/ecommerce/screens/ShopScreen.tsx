@@ -372,6 +372,41 @@ const ShopCatalog: React.FC<ShopCatalogProps> = ({
     </View>
   );
 
+  const listFooter = !imageSearchUri && currentPage ? (
+    <View className="px-3 pb-5 pt-3">
+      {productsQuery.isError ? (
+        <View className="mb-2 flex-row items-center justify-between rounded-xl bg-red-50 px-3 py-2">
+          <Text className="mr-2 flex-1 text-[11px] text-red-700">
+            পণ্য আপডেট করা যায়নি: {productsQuery.error.message}
+          </Text>
+          <TouchableOpacity onPress={retryProducts}>
+            <Text className="text-[11px] font-bold text-primary">আবার চেষ্টা</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {currentPage.totalPages > 1 ? (
+        <ShopPagination
+          currentPage={
+            productsQuery.isPlaceholderData ? currentPage.page : currentPageNumber
+          }
+          totalPages={currentPage.totalPages}
+          hasPrevious={!productsQuery.isPlaceholderData && currentPageNumber > 1}
+          hasNext={
+            !productsQuery.isPlaceholderData &&
+            currentPageNumber < currentPage.totalPages
+          }
+          isChangingPage={productsQuery.isPlaceholderData}
+          isLoadingPage={
+            (productsQuery.isPlaceholderData && productsQuery.isFetching) ||
+            (productsQuery.isFetching && currentPage.page !== currentPageNumber)
+          }
+          onPrevious={handlePreviousPage}
+          onNext={() => void handleNextPage()}
+        />
+      ) : null}
+    </View>
+  ) : null;
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">
       <FlatList
@@ -385,12 +420,13 @@ const ShopCatalog: React.FC<ShopCatalogProps> = ({
           alignItems: 'stretch',
           justifyContent: 'space-between',
         }}
-        contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 4 }}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={7}
         updateCellsBatchingPeriod={40}
         ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
         refreshControl={
           <RefreshControl
             refreshing={imageSearchUri
@@ -467,40 +503,6 @@ const ShopCatalog: React.FC<ShopCatalogProps> = ({
           )
         }
       />
-      {!imageSearchUri && currentPage ? (
-        <View className="px-3 pb-2 pt-1">
-          {productsQuery.isError ? (
-            <View className="mb-2 flex-row items-center justify-between rounded-xl bg-red-50 px-3 py-2">
-              <Text className="mr-2 flex-1 text-[11px] text-red-700">
-                পণ্য আপডেট করা যায়নি: {productsQuery.error.message}
-              </Text>
-              <TouchableOpacity onPress={retryProducts}>
-                <Text className="text-[11px] font-bold text-primary">আবার চেষ্টা</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-          {currentPage.totalPages > 1 ? (
-            <ShopPagination
-              currentPage={
-                productsQuery.isPlaceholderData ? currentPage.page : currentPageNumber
-              }
-              totalPages={currentPage.totalPages}
-              hasPrevious={!productsQuery.isPlaceholderData && currentPageNumber > 1}
-              hasNext={
-                !productsQuery.isPlaceholderData &&
-                currentPageNumber < currentPage.totalPages
-              }
-              isChangingPage={productsQuery.isPlaceholderData}
-              isLoadingPage={
-                (productsQuery.isPlaceholderData && productsQuery.isFetching) ||
-                (productsQuery.isFetching && currentPage.page !== currentPageNumber)
-              }
-              onPrevious={handlePreviousPage}
-              onNext={() => void handleNextPage()}
-            />
-          ) : null}
-        </View>
-      ) : null}
     </SafeAreaView>
   );
 };

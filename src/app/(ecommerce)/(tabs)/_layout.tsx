@@ -1,5 +1,5 @@
-import type { ComponentProps } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useState, type ComponentProps } from 'react';
+import { Animated, Pressable, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,114 @@ import { CenterShopButton } from '../../../shared/components/CenterShopButton';
 import { colors } from '../../../shared/theme/colors';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
+
+interface EcommerceTabButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  focused: boolean;
+  accessibilityLabel?: string;
+  testID?: string;
+  onPress: () => void;
+  onLongPress: () => void;
+}
+
+function EcommerceTabButton({
+  icon,
+  label,
+  focused,
+  accessibilityLabel,
+  testID,
+  onPress,
+  onLongPress,
+}: EcommerceTabButtonProps) {
+  const [focusProgress] = useState(() => new Animated.Value(focused ? 1 : 0));
+  const [pressScale] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    const animation = Animated.spring(focusProgress, {
+      toValue: focused ? 1 : 0,
+      stiffness: 280,
+      damping: 22,
+      mass: 0.7,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [focusProgress, focused]);
+
+  const onPressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.94,
+      stiffness: 420,
+      damping: 24,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      stiffness: 360,
+      damping: 18,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      className="mx-0.5 flex-1 items-center justify-center rounded-2xl py-1"
+    >
+      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+        <Animated.View
+          className="h-8 w-8 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: focused ? colors.primaryLight : 'transparent',
+            transform: [{
+              scale: focusProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.84, 1],
+              }),
+            }],
+          }}
+        >
+          <Ionicons
+            name={icon}
+            size={20}
+            color={focused ? colors.primary : colors.muted}
+          />
+        </Animated.View>
+        <Animated.Text
+          numberOfLines={1}
+          className={`mt-0.5 text-[8px] ${
+            focused ? 'font-extrabold text-primary' : 'font-medium text-muted'
+          }`}
+          style={{
+            opacity: focusProgress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.78, 1],
+            }),
+            transform: [{
+              translateY: focusProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [2, 0],
+              }),
+            }],
+          }}
+        >
+          {label}
+        </Animated.Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 const tabItems = [
   { name: 'index', label: 'হোম', icon: 'home-outline' },
@@ -24,17 +132,18 @@ function EcommerceTabBar({ state, descriptors, navigation }: TabBarProps) {
 
   return (
     <View
-      className="px-3 pt-2"
-      style={{ paddingBottom: Math.max(insets.bottom, 8), backgroundColor: 'transparent' }}
+      className="px-2 pt-1"
+      style={{ paddingBottom: Math.max(insets.bottom, 5), backgroundColor: colors.background }}
     >
       <View
-        className="h-[72px] flex-row items-center rounded-[26px] border border-white bg-white px-1"
+        className="h-[66px] flex-row items-center rounded-[22px] border bg-white px-1"
         style={{
-          shadowColor: colors.ink,
-          shadowOffset: { width: 0, height: 5 },
+          borderColor: '#D9EFFC',
+          shadowColor: colors.primaryDark,
+          shadowOffset: { width: 0, height: 3 },
           shadowOpacity: 0.12,
-          shadowRadius: 14,
-          elevation: 10,
+          shadowRadius: 10,
+          elevation: 7,
         }}
       >
         {tabItems.map((item) => {
@@ -71,34 +180,17 @@ function EcommerceTabBar({ state, descriptors, navigation }: TabBarProps) {
             );
           }
 
-          const iconName = item.icon as keyof typeof Ionicons.glyphMap;
           return (
-            <Pressable
+            <EcommerceTabButton
               key={item.name}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isFocused }}
+              icon={item.icon}
+              label={item.label}
+              focused={isFocused}
               accessibilityLabel={options.tabBarAccessibilityLabel ?? item.label}
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}
-              className={`mx-0.5 flex-1 items-center justify-center rounded-2xl py-2 ${
-                isFocused ? 'bg-primary-light' : 'bg-transparent'
-              }`}
-            >
-              <Ionicons
-                name={iconName}
-                size={21}
-                color={isFocused ? colors.primary : colors.muted}
-              />
-              <Text
-                numberOfLines={1}
-                className={`mt-1 text-[9px] ${
-                  isFocused ? 'font-bold text-primary' : 'font-medium text-muted'
-                }`}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
+            />
           );
         })}
       </View>
