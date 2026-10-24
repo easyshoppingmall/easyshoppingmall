@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useAppSelector } from '../../../store/hooks';
 import { authApi } from '../../../api/authApi';
 import {
@@ -11,6 +11,7 @@ import {
   getDropshippingSubcategories,
   getDropshippingSubcategoryProducts,
   searchDropshippingProducts,
+  DROPSHIPPING_NEW_PRODUCT_CUTOFF,
   type DropshippingProductType,
 } from './homeApi';
 import { getDropshippingWishlist } from './wishlistApi';
@@ -134,9 +135,21 @@ export function useActiveDropshippingNoticesQuery() {
 }
 
 export function useDropshippingProductsQuery(type: DropshippingProductType) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: dropshippingHomeQueryKeys.products(type),
-    queryFn: ({ signal }) => getDropshippingProducts(type, signal),
+    queryFn: ({ pageParam, signal }) =>
+      getDropshippingProducts(type, pageParam, 40, signal),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page >= lastPage.totalPages) return undefined;
+      if (type === 'new' && lastPage.products.some((product) => {
+        const createdAt = product.createdAt ? new Date(product.createdAt).getTime() : Number.NaN;
+        return Number.isFinite(createdAt) && createdAt < DROPSHIPPING_NEW_PRODUCT_CUTOFF;
+      })) {
+        return undefined;
+      }
+      return lastPage.page + 1;
+    },
     staleTime: 60_000,
   });
 }

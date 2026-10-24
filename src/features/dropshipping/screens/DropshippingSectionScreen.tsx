@@ -1,7 +1,8 @@
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../../shared/theme/colors';
 import { useDropshippingProfileQuery } from '../api/queries';
@@ -19,6 +20,106 @@ import {
 import { DropshippingSellerDashboardScreen } from './DropshippingSellerDashboardScreen';
 import { DropshippingMyAnalyticsScreen } from './DropshippingMyAnalyticsScreen';
 import { DropshippingTeamSystemScreen } from './DropshippingTeamSystemScreen';
+import { DropshippingFeaturedProductsScreen } from './DropshippingFeaturedProductsScreen';
+
+const DROPSHIPPING_WEBSITE_URL = 'https://easyshoppingmallbd.com';
+
+function DropshippingVideoScreen() {
+  const router = useRouter();
+
+  const openWebsite = async () => {
+    try {
+      await Linking.openURL(DROPSHIPPING_WEBSITE_URL);
+    } catch {
+      Alert.alert(
+        'ওয়েবসাইট খোলা যায়নি',
+        'ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।'
+      );
+    }
+  };
+
+  return (
+    <SafeAreaView edges={['top']} className="flex-1 bg-bg">
+      <View className="flex-row items-center border-b border-line bg-white px-4 py-3">
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="ড্রপশিপিং হোমে ফিরুন"
+          onPress={() => router.replace('/(dropshipping)')}
+          className="mr-3 h-10 w-10 items-center justify-center rounded-full border border-line bg-white"
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.ink} />
+        </TouchableOpacity>
+        <View className="flex-1">
+          <Text className="text-[16px] font-extrabold text-ink">ভিডিও ও কোর্স</Text>
+          <Text className="mt-0.5 text-[10px] text-muted">শিখুন, এগিয়ে যান</Text>
+        </View>
+        <Ionicons name="play-circle-outline" size={24} color={colors.primary} />
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-4 pb-8 pt-5"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="overflow-hidden rounded-[24px] bg-primary p-5">
+          <View className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10" />
+          <View className="h-14 w-14 items-center justify-center rounded-2xl border border-white/25 bg-white/15">
+            <Ionicons name="play" size={27} color="#FFFFFF" />
+          </View>
+          <Text className="mt-4 text-[18px] font-extrabold leading-6 text-white">
+            ভিডিও দেখুন, নতুন কিছু শিখুন
+          </Text>
+          <Text className="mt-2 text-[11px] leading-5 text-white/85">
+            ড্রপশিপিং শেখার ভিডিও দেখতে অথবা আপনার পছন্দের কোর্সে ভর্তি হতে আমাদের ওয়েবসাইটে ভিজিট করুন।
+          </Text>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="EasyShoppingMallBD ওয়েবসাইট খুলুন"
+            onPress={() => void openWebsite()}
+            className="mt-5 min-h-11 flex-row items-center justify-center rounded-xl bg-white px-4 py-3"
+          >
+            <Ionicons name="globe-outline" size={17} color={colors.primary} />
+            <Text className="ml-2 text-[11px] font-extrabold text-primary">
+              ওয়েবসাইটে ভিডিও দেখুন / কোর্স নিন
+            </Text>
+            <Ionicons name="open-outline" size={14} color={colors.primary} style={{ marginLeft: 7 }} />
+          </Pressable>
+          <Text className="mt-2 text-center text-[9px] text-white/75">
+            easyshoppingmallbd.com
+          </Text>
+        </View>
+
+        <View className="mt-4 overflow-hidden rounded-2xl border border-cyan-100 bg-white p-4">
+          <View className="flex-row items-start">
+            <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-cyan-50">
+              <Ionicons name="phone-portrait-outline" size={19} color={colors.primary} />
+            </View>
+            <View className="flex-1">
+              <View className="self-start rounded-full bg-cyan-50 px-2.5 py-1">
+                <Text className="text-[8px] font-extrabold tracking-wide text-primary">
+                  শীঘ্রই অ্যাপে আসছে
+                </Text>
+              </View>
+              <Text className="mt-2 text-[13px] font-extrabold text-ink">
+                অ্যাপের ভেতরেই ভিডিও দেখার সুবিধা
+              </Text>
+              <Text className="mt-1.5 text-[10px] leading-5 text-muted">
+                অ্যাপে ভিডিও দেখানোর ব্যবস্থা নিয়ে কাজ চলছে। সুবিধাটি পরবর্তী আপডেটে যুক্ত হবে। আপডেটটি এলে আপনি সরাসরি অ্যাপ থেকেই ভিডিও দেখতে পারবেন।
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View className="mt-4 flex-row items-start rounded-xl bg-primary-light px-3.5 py-3">
+          <Ionicons name="information-circle-outline" size={17} color={colors.primaryDark} />
+          <Text className="ml-2 flex-1 text-[9px] leading-4 text-primary-dark">
+            আপাতত ভিডিও দেখা ও কোর্সে ভর্তি হওয়ার জন্য EasyShoppingMallBD ওয়েবসাইট ব্যবহার করুন।
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 const SECTIONS: Record<
   string,
@@ -148,9 +249,10 @@ function DropshippingSectionContent({ section }: { section?: string }) {
     return <DropshippingSellerDashboardScreen />;
   }
   if (section === 'payment-request') return <DropshippingPaymentRequestScreen />;
-  if (section === 'all-products' || section === 'new-products') {
-    return <DropshippingAllProductsScreen />;
-  }
+  if (section === 'video') return <DropshippingVideoScreen />;
+  if (section === 'new-products') return <DropshippingFeaturedProductsScreen type="new" />;
+  if (section === 'boost-products') return <DropshippingFeaturedProductsScreen type="boost" />;
+  if (section === 'all-products') return <DropshippingAllProductsScreen />;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg px-4">

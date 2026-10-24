@@ -28,6 +28,11 @@ interface ApiNotice {
 interface ApiProduct {
   _id: string;
   productName?: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  date?: string;
   description?: string;
   brand?: string;
   price?: number | string | null;
@@ -122,6 +127,8 @@ export interface DropshippingNotice {
 export interface DropshippingProduct {
   id: string;
   name: string;
+  createdAt?: string;
+  isBoost?: boolean;
   brand?: string;
   price: number;
   dropshippingPrice?: number;
@@ -163,6 +170,8 @@ export interface DropshippingProductPage {
 }
 
 export type DropshippingProductType = 'all' | 'new' | 'boost';
+export const DROPSHIPPING_NEW_PRODUCT_CUTOFF =
+  Date.now() - 30 * 24 * 60 * 60 * 1000;
 
 export function formatDropshippingTaka(amount: number): string {
   return `৳${formatDropshippingNumber(amount)}`;
@@ -220,6 +229,8 @@ function mapDropshippingProduct(product: ApiProduct): DropshippingProduct {
   return {
     id: product._id,
     name: product.productName?.trim() || 'নামহীন পণ্য',
+    createdAt: product.createdAt ?? product.created_at ?? product.date,
+    isBoost: product.isBoost,
     brand: product.brand?.trim() || undefined,
     price: toOptionalNumber(product.price) ?? 0,
     dropshippingPrice: toOptionalNumber(product.dropshippingPrice),
@@ -358,13 +369,15 @@ export async function getActiveDropshippingNotices(
 
 export async function getDropshippingProducts(
   type: DropshippingProductType,
+  page = 1,
+  limit = 40,
   signal?: AbortSignal
-): Promise<DropshippingProduct[]> {
+): Promise<DropshippingProductPage> {
   const { data } = await apiClient.post<ApiProductPage>(
     '/api/products/get',
     {
-      page: 1,
-      limit: 8,
+      page,
+      limit,
       sortBy: type === 'all' ? 'discount' : 'newest',
       ...(type === 'boost' ? { isBoost: true } : {}),
     },
@@ -383,7 +396,22 @@ export async function getDropshippingProducts(
     if (!product._id || uniqueProducts.has(product._id)) continue;
     uniqueProducts.set(product._id, mapDropshippingProduct(product));
   }
-  return [...uniqueProducts.values()];
+  const responsePage = Number(data.page ?? page);
+  const totalPages = Number(data.totalPages ?? responsePage);
+  const totalCount = Number(data.totalCount ?? uniqueProducts.size);
+  if (
+    !Number.isInteger(responsePage) || responsePage !== page ||
+    !Number.isInteger(totalPages) || totalPages < 0 ||
+    !Number.isFinite(totalCount) || totalCount < 0
+  ) {
+    throw new Error('সার্ভার থেকে পণ্যের pagination তথ্য পাওয়া যায়নি।');
+  }
+  return {
+    products: [...uniqueProducts.values()],
+    page: responsePage,
+    totalPages,
+    totalCount,
+  };
 }
 
 export async function searchDropshippingProducts(

@@ -326,7 +326,10 @@ export function DropshippingIndexScreen() {
         router.push('/(dropshipping)/all-products');
         break;
       case 'new-products':
-        router.push('/(dropshipping)/all-products');
+        router.push({
+          pathname: '/(dropshipping)/[section]',
+          params: { section: 'new-products' },
+        });
         break;
       case 'section':
         if (item.section) {
