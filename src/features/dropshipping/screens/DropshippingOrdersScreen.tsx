@@ -607,7 +607,7 @@ export function DropshippingOrdersScreen() {
           ordersQuery.isPending
             ? <OrderListSkeleton />
             : ordersQuery.isError
-              ? null
+              ? undefined
               : <EmptyState searching={Boolean(debouncedSearch) || statusFilter !== 'all'} />
         }
         ListFooterComponent={pageCount > 1 ? (

@@ -7,7 +7,6 @@ import {
   RefreshControl,
   Text,
   View,
-  type ViewToken,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,7 +83,7 @@ export function DropshippingFeaturedProductsScreen({
     });
   }, [productsQuery.data, type]);
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken<DropshippingProduct>[] }) => {
+    ({ viewableItems }: { viewableItems: { item: DropshippingProduct }[] }) => {
       const visibleIds = new Set(viewableItems.map(({ item }) => item.id));
       setVisibleProductIds((current) =>
         current.size === visibleIds.size && [...current].every((id) => visibleIds.has(id))
@@ -295,7 +294,7 @@ export function DropshippingFeaturedProductsScreen({
             >
               <Text className="text-[10px] font-bold text-primary">আরও পণ্য লোড করতে চাপ দিন</Text>
             </Pressable>
-          ) : null
+          ) : undefined
         }
       />
     </SafeAreaView>

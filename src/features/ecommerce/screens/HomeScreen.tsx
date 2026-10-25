@@ -154,8 +154,8 @@ export const HomeScreen: React.FC = () => {
   const homeHeader = (
     <View>
       <Header
-        onProfilePress={() => router.push('/(ecommerce)/(tabs)/profile')}
-        onCartPress={() => router.push('/(ecommerce)/(tabs)/cart')}
+        onProfilePress={() => router.push('/(ecommerce)/profile')}
+        onCartPress={() => router.push('/(ecommerce)/cart')}
       />
 
       <SearchBar
@@ -397,8 +397,8 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
         ListEmptyComponent={
-          subcategoryProductsLoading ? null : subcategoriesQuery.isError ||
-            subcategoryProductsQuery.isError ? null : (
+          subcategoryProductsLoading ? undefined : subcategoriesQuery.isError ||
+            subcategoryProductsQuery.isError ? undefined : (
               <View className="rounded-2xl border border-line bg-white px-4 py-5">
                 <Text className="text-center text-[12px] text-muted">
                   এখনো কোনো সাব-ক্যাটাগরির পণ্য পাওয়া যায়নি

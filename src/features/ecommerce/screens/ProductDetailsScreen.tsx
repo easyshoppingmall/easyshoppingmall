@@ -119,7 +119,7 @@ export const ProductDetailsScreen: React.FC = () => {
       }));
       await queryClient.invalidateQueries({ queryKey: ['customer', 'cart', userId] });
       if (shouldNavigateToCart) {
-        router.push('/(ecommerce)/(tabs)/cart');
+        router.push('/(ecommerce)/cart');
       } else {
         Alert.alert('কার্টে যোগ হয়েছে', `${product.name} কার্টে যোগ করা হয়েছে।`);
       }
@@ -255,7 +255,7 @@ export const ProductDetailsScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push('/(ecommerce)/(tabs)/cart')}
+            onPress={() => router.push('/(ecommerce)/cart')}
             activeOpacity={0.7}
             className="w-9 h-9 rounded-full bg-primary-light items-center justify-center relative"
           >

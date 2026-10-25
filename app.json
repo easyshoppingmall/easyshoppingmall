@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0092EE"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -43,7 +38,19 @@
         {
           "photosPermission": "Allow EasyShoppingMallBD to access photos.",
           "savePhotosPermission": "Allow EasyShoppingMallBD to save product images.",
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo.png",
+          "imageWidth": 100,
+          "resizeMode": "contain",
+          "backgroundColor": "#0092EE"
         }
       ]
     ]

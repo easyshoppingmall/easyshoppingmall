@@ -556,7 +556,7 @@ export function DropshippingTeamSystemScreen() {
           </View>
         }
         ListEmptyComponent={
-          query.isPending || query.isError ? null : (
+          query.isPending || query.isError ? undefined : (
             <View className="items-center rounded-2xl border border-[#D9EAD9] bg-white px-4 py-7">
               <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary-light">
                 <Ionicons

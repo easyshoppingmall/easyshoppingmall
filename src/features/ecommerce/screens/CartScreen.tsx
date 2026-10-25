@@ -293,7 +293,7 @@ export const CartScreen: React.FC = () => {
           text: 'অর্ডার বিস্তারিত',
           onPress: () => order._id
             ? router.push({ pathname: '/(ecommerce)/order/[id]', params: { id: order._id } })
-            : router.push('/(ecommerce)/(tabs)/profile'),
+            : router.push('/(ecommerce)/profile'),
         }]
       );
     },
@@ -344,7 +344,7 @@ export const CartScreen: React.FC = () => {
             <Text className="text-[11px] font-bold text-primary">{toBengaliNumber(totalQuantity)} টি</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(ecommerce)/(tabs)/profile')} className="flex-row items-center">
+        <TouchableOpacity onPress={() => router.push('/(ecommerce)/profile')} className="flex-row items-center">
           <Ionicons name="person-circle-outline" size={20} color={colors.primary} />
           <Text className="ml-1 text-[12px] font-semibold text-primary">প্রোফাইল</Text>
         </TouchableOpacity>

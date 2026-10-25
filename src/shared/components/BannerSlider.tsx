@@ -7,8 +7,9 @@ import {
   ScrollView,
   TouchableOpacity,
   View,
+  type ImageLoadEvent,
+  type ScrollViewInstance,
 } from 'react-native';
-import type { ImageLoadEventData } from 'react-native';
 import type { Banner } from '../../features/ecommerce/data/catalog';
 
 interface BannerSliderProps {
@@ -25,7 +26,7 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
   const [imageRatios, setImageRatios] = useState<Record<string, number>>({});
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const isInteracting = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -96,7 +97,7 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
                   <Image
                     source={{ uri: banner.image }}
                     resizeMode="contain"
-                    onLoad={(event: NativeSyntheticEvent<ImageLoadEventData>) => {
+                    onLoad={(event: ImageLoadEvent) => {
                       const { width, height: imageHeight } = event.nativeEvent.source;
                       if (width > 0 && imageHeight > 0) {
                         setImageRatios((current) => ({

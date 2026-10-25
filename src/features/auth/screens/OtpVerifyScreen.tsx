@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  type TextInputInstance,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -51,7 +52,7 @@ export function OtpVerifyScreen() {
   const secondsUntilExpiry = expiresAt ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : 0;
   const canResend = now >= resendAvailableAt;
 
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<(TextInputInstance | null)[]>([]);
   const [fadeAnim] = useState(() => new Animated.Value(0));
   const [shakeAnim] = useState(() => new Animated.Value(0));
   const sendOtpMutation = useSendOtpMutation();

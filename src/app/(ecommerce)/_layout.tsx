@@ -3,6 +3,10 @@ import { Redirect, Stack } from 'expo-router';
 import { useAppSelector } from '../../store/hooks';
 import { colors } from '../../shared/theme/colors';
 
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
 export default function EcommerceLayout() {
   const { isInitialized, isAuthenticated, user } = useAppSelector((state) => state.auth);
 
@@ -17,5 +21,11 @@ export default function EcommerceLayout() {
   if (!isAuthenticated || !user) return <Redirect href="/(auth)/sign-in" />;
   if (user.role?.toUpperCase() === 'DROPSHIPPING') return <Redirect href="/(dropshipping)" />;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="cart" />
+      <Stack.Screen name="profile" />
+    </Stack>
+  );
 }

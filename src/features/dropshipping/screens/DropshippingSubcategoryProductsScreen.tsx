@@ -8,7 +8,6 @@ import {
   RefreshControl,
   Text,
   View,
-  type ViewToken,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,7 +78,7 @@ export function DropshippingSubcategoryProductsScreen() {
   const page = pagination.subcategoryId === subcategoryId ? pagination.page : 1;
   const listRef = useRef<FlatList<DropshippingProduct>>(null);
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken<DropshippingProduct>[] }) => {
+    ({ viewableItems }: { viewableItems: { item: DropshippingProduct }[] }) => {
       const visibleIds = new Set(viewableItems.map(({ item }) => item.id));
       setVisibleProductIds((current) =>
         current.size === visibleIds.size && [...current].every((id) => visibleIds.has(id))
@@ -218,7 +217,7 @@ export function DropshippingSubcategoryProductsScreen() {
                     পৃষ্ঠা {formatDropshippingNumber(productsQuery.data.page)} / {formatDropshippingNumber(totalPages)}
                   </Text>
                 </View>
-              ) : null
+              ) : undefined
             }
             renderItem={({ item }) => (
               <View style={{ width: cardWidth, marginBottom: gap }}>

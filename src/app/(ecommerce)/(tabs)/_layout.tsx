@@ -124,12 +124,8 @@ const tabItems = [
   { name: 'contact', label: 'যোগাযোগ', icon: 'call-outline' },
 ] as const;
 
-function EcommerceTabBar({ state, descriptors, navigation }: TabBarProps) {
+function EcommerceTabBar({ state, descriptors, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
-  const activeRoute = state.routes[state.index]?.name;
-
-  if (activeRoute === 'cart' || activeRoute === 'profile') return null;
-
   return (
     <View
       className="px-2 pt-1"
@@ -154,18 +150,18 @@ function EcommerceTabBar({ state, descriptors, navigation }: TabBarProps) {
           const isFocused = state.index === routeIndex;
           const options = descriptors[route.key].options;
           const onPress = () => {
-            const event = navigation.emit({
+            const event = emitter.emit({
               type: 'tabPress',
               target: route.key,
               canPreventDefault: true,
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
+              navigateToTab(route.key);
             }
           };
           const onLongPress = () => {
-            navigation.emit({ type: 'tabLongPress', target: route.key });
+            emitter.emit({ type: 'tabLongPress', target: route.key });
           };
 
           if (item.name === 'shop') {
@@ -201,7 +197,6 @@ function EcommerceTabBar({ state, descriptors, navigation }: TabBarProps) {
 export default function EcommerceTabsLayout() {
   return (
     <Tabs
-      initialRouteName="index"
       tabBar={(props) => <EcommerceTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
@@ -210,8 +205,6 @@ export default function EcommerceTabsLayout() {
       <Tabs.Screen name="shop" options={{ title: 'শপ' }} />
       <Tabs.Screen name="about" options={{ title: 'আমাদের সম্পর্কে' }} />
       <Tabs.Screen name="contact" options={{ title: 'যোগাযোগ' }} />
-      <Tabs.Screen name="cart" options={{ href: null, title: 'কার্ট' }} />
-      <Tabs.Screen name="profile" options={{ href: null, title: 'প্রোফাইল' }} />
     </Tabs>
   );
 }

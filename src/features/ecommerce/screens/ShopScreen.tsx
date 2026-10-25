@@ -183,8 +183,8 @@ const ShopCatalog: React.FC<ShopCatalogProps> = ({
     <View>
       <Header
         title="শপ"
-        onProfilePress={() => router.push('/(ecommerce)/(tabs)/profile')}
-        onCartPress={() => router.push('/(ecommerce)/(tabs)/cart')}
+        onProfilePress={() => router.push('/(ecommerce)/profile')}
+        onCartPress={() => router.push('/(ecommerce)/cart')}
       />
       <SearchBar
         placeholder="পণ্য খুঁজুন"
@@ -405,7 +405,7 @@ const ShopCatalog: React.FC<ShopCatalogProps> = ({
         />
       ) : null}
     </View>
-  ) : null;
+  ) : undefined;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-bg">

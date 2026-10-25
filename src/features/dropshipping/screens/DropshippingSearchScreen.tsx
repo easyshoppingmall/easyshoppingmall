@@ -10,7 +10,6 @@ import {
   Text,
   TextInput,
   View,
-  type ViewToken,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -90,7 +89,7 @@ export function DropshippingSearchScreen() {
   const [page, setPage] = useState(1);
   const [visibleProductIds, setVisibleProductIds] = useState<Set<string>>(() => new Set());
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken<DropshippingProduct>[] }) => {
+    ({ viewableItems }: { viewableItems: { item: DropshippingProduct }[] }) => {
       const visibleIds = new Set(viewableItems.map(({ item }) => item.id));
       setVisibleProductIds((current) =>
         current.size === visibleIds.size && [...current].every((id) => visibleIds.has(id))
@@ -274,7 +273,7 @@ export function DropshippingSearchScreen() {
                 </Text>
               ) : null}
             </View>
-          ) : null
+          ) : undefined
         }
         renderItem={({ item }) => {
           const isWishlisted = wishlistQuery.data?.some((saved) => saved.id === item.id) ?? false;
@@ -356,7 +355,7 @@ export function DropshippingSearchScreen() {
                 <Ionicons name="chevron-forward" size={18} color={colors.ink} />
               </Pressable>
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </SafeAreaView>

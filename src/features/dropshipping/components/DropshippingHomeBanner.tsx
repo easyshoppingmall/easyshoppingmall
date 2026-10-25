@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import {
+  ScrollView,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 import { Image } from 'expo-image';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import type { DropshippingBanner } from '../api/homeApi';
 import { colors } from '../../../shared/theme/colors';
 
@@ -12,7 +18,7 @@ interface DropshippingHomeBannerProps {
 export function DropshippingHomeBanner({ banners }: DropshippingHomeBannerProps) {
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const interacting = useRef(false);
 
   useEffect(() => {
