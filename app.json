@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "EasyShoppingMallBD",
+    "name": "EasyShoppingMall",
     "slug": "easyshoppingmallbd",
-    "scheme": "easyshoppingmallbd",
+    "scheme": "easyshoppingmall",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -15,7 +15,14 @@
         "backgroundColor": "#E5F4FD",
         "foregroundImage": "./assets/logo.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "package": "com.easyshoppingmall.easyshoppingmallbd"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -53,6 +60,16 @@
           "backgroundColor": "#0092EE"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "cb824d01-e02f-431f-a639-a491bf22d6ac"
+      }
+    }
   }
 }
