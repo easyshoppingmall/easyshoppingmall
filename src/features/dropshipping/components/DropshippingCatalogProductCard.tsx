@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../shared/theme/colors';
 import { formatDropshippingTaka } from '../api/homeApi';
-import { downloadDropshippingImage } from '../api/imageDownload';
+import { downloadDropshippingImages } from '../api/imageDownload';
 import type { DropshippingProduct } from '../api/homeApi';
 import { useDropshippingProductDetailsQuery } from '../api/queries';
 
@@ -37,8 +37,12 @@ export function DropshippingCatalogProductCard({
   const videoUrl = product.videoUrl || detailsQuery.data?.videoUrl;
   const downloadMutation = useMutation({
     mutationFn: () => {
-      if (!product.image) throw new Error('এই পণ্যের ছবি পাওয়া যায়নি।');
-      return downloadDropshippingImage(product.id, product.image);
+      const images = product.images?.length
+        ? product.images
+        : product.image
+          ? [product.image]
+          : [];
+      return downloadDropshippingImages(product.id, images);
     },
     onError: (error) => {
       Alert.alert(
@@ -46,7 +50,10 @@ export function DropshippingCatalogProductCard({
         error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'
       );
     },
-    onSuccess: () => Alert.alert('ছবি সংরক্ষিত', 'পণ্যের ছবি গ্যালারিতে সেভ হয়েছে।'),
+    onSuccess: (imageCount) => Alert.alert(
+      'ছবি সংরক্ষিত',
+      `${imageCount}টি পণ্যের ছবি গ্যালারিতে সেভ হয়েছে।`
+    ),
   });
 
   const openVideo = async () => {
@@ -112,7 +119,7 @@ export function DropshippingCatalogProductCard({
         {product.image ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${product.name} ছবিটি ডাউনলোড করুন`}
+            accessibilityLabel={`${product.name} সব ছবি ডাউনলোড করুন`}
             disabled={downloadMutation.isPending}
             onPress={() => downloadMutation.mutate()}
             className="h-9 w-9 items-center justify-center rounded-full bg-white/95"

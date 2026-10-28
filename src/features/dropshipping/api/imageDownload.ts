@@ -13,15 +13,20 @@ function getImageExtension(imageUrl: string): string {
 
 export async function downloadDropshippingImage(
   productId: string,
-  imageUrl: string
+  imageUrl: string,
+  imageNumber?: number
 ): Promise<void> {
+  const fileName = imageNumber === undefined
+    ? productId
+    : `${productId}-${imageNumber}`;
+
   if (Platform.OS === 'web') {
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error('ছবিটি ডাউনলোড করা যায়নি।');
     const objectUrl = URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');
     anchor.href = objectUrl;
-    anchor.download = `${productId}.${getImageExtension(imageUrl)}`;
+    anchor.download = `${fileName}.${getImageExtension(imageUrl)}`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -31,7 +36,7 @@ export async function downloadDropshippingImage(
 
   const file = new File(
     Paths.cache,
-    `dropshipping-${productId}.${getImageExtension(imageUrl)}`
+    `dropshipping-${fileName}.${getImageExtension(imageUrl)}`
   );
   const downloadedFile = file.exists
     ? file
@@ -45,4 +50,23 @@ export async function downloadDropshippingImage(
     throw new Error('গ্যালারিতে ছবি সংরক্ষণ করতে Photos অনুমতি দিন।');
   }
   await MediaLibrary.createAssetAsync(downloadedFile.uri);
+}
+
+export async function downloadDropshippingImages(
+  productId: string,
+  imageUrls: string[]
+): Promise<number> {
+  const uniqueImageUrls = [...new Set(
+    imageUrls.map((imageUrl) => imageUrl.trim()).filter(Boolean)
+  )];
+
+  if (uniqueImageUrls.length === 0) {
+    throw new Error('এই পণ্যের ছবি পাওয়া যায়নি।');
+  }
+
+  for (const [index, imageUrl] of uniqueImageUrls.entries()) {
+    await downloadDropshippingImage(productId, imageUrl, index + 1);
+  }
+
+  return uniqueImageUrls.length;
 }
