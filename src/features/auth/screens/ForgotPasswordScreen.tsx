@@ -187,10 +187,13 @@ export function ForgotPasswordScreen() {
     setIsLoading(true);
     setError('');
     try {
+      const trimmedPassword = newPassword.trim();
       const res = await resetPasswordMutation.mutateAsync({
         email: emailOrPhone.trim().toLowerCase(),
         otp: otp.trim(),
-        newPassword,
+        newPassword: trimmedPassword,
+        newpassword: trimmedPassword,
+        password: trimmedPassword,
       });
       if (res.success) {
         setStep('done');
@@ -199,7 +202,7 @@ export function ForgotPasswordScreen() {
         setError(res.message || 'পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে');
+      setError(err?.response?.data?.message || err?.message || 'পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে');
     } finally {
       setIsLoading(false);
     }
@@ -349,13 +352,16 @@ export function ForgotPasswordScreen() {
                   <View style={styles.inputContainer}>
                     <Ionicons name="lock-open-outline" size={18} color={colors.muted} style={styles.inputIcon} />
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { flex: 1 }]}
                       placeholder="পাসওয়ার্ড নিশ্চিত করুন"
                       placeholderTextColor={colors.muted}
                       value={confirmPassword}
                       onChangeText={(t) => { setConfirmPassword(t); setError(''); }}
                       secureTextEntry={!showPassword}
                     />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                      <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} />
+                    </TouchableOpacity>
                   </View>
                 </View>
               </>
@@ -416,10 +422,10 @@ export function ForgotPasswordScreen() {
                     {step === 'request'
                       ? 'OTP পাঠান'
                       : step === 'otp'
-                      ? 'যাচাই করুন'
-                      : step === 'newPassword'
-                      ? 'পাসওয়ার্ড রিসেট করুন'
-                      : 'লগইন করুন'}
+                        ? 'যাচাই করুন'
+                        : step === 'newPassword'
+                          ? 'পাসওয়ার্ড রিসেট করুন'
+                          : 'লগইন করুন'}
                   </Text>
                 )}
               </LinearGradient>

@@ -31,7 +31,9 @@ export interface VerifyOtpPayload {
 export interface ResetPasswordPayload {
   email: string;
   otp: string;
-  newPassword: string;
+  newPassword?: string;
+  newpassword?: string;
+  password?: string;
 }
 
 export interface UpdateOwnProfilePayload {
@@ -69,6 +71,8 @@ export interface UpdateDropshippingShopSettingsPayload {
 export interface ChangePasswordPayload {
   currentPassword: string;
   newPassword: string;
+  newpassword?: string;
+  password?: string;
 }
 
 export interface AuthResponse {
@@ -416,7 +420,14 @@ export const authApi = {
 
   /** Reset password with OTP */
   resetPassword: async (payload: ResetPasswordPayload): Promise<AuthResponse> => {
-    const { data } = await apiClient.post(`${BASE}/reset-password`, payload);
+    const password = (payload.newPassword || payload.newpassword || payload.password || '').trim();
+    const { data } = await apiClient.post(`${BASE}/reset-password`, {
+      email: payload.email.trim(),
+      otp: payload.otp.trim(),
+      newpassword: password,
+      newPassword: password,
+      password: password,
+    });
     return normalizeAuthResponse(data);
   },
 
@@ -492,8 +503,15 @@ export const authApi = {
 
   /** Change the authenticated user's password and return the replacement session token. */
   changePassword: async (payload: ChangePasswordPayload): Promise<AuthResponse> => {
-    const { data, headers } = await apiClient.put(`${BASE}/change-password`, payload);
-    return normalizeAuthResponse(data, headers.authorization ?? headers['x-auth-token']);
+    const password = (payload.newPassword || payload.newpassword || payload.password || '').trim();
+    const { data, headers } = await apiClient.put(`${BASE}/change-password`, {
+      currentPassword: payload.currentPassword,
+      oldPassword: payload.currentPassword,
+      newpassword: password,
+      newPassword: password,
+      password: password,
+    });
+    return normalizeAuthResponse(data, headers?.authorization ?? headers?.['x-auth-token']);
   },
 };
 
