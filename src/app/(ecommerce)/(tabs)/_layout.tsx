@@ -70,47 +70,67 @@ function EcommerceTabButton({
       onLongPress={onLongPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      className="mx-0.5 flex-1 items-center justify-center rounded-2xl py-1"
+      className="mx-0.5 flex-1 items-center justify-center"
     >
-      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+      <Animated.View
+        style={{
+          transform: [{ scale: pressScale }],
+          width: '100%',
+        }}
+        className="items-center justify-center"
+      >
         <Animated.View
-          className="h-8 w-8 items-center justify-center rounded-xl"
+          className="w-full items-center justify-center rounded-2xl px-1 py-1.5"
           style={{
             backgroundColor: focused ? colors.primaryLight : 'transparent',
+            borderWidth: focused ? 1 : 0,
+            borderColor: focused ? '#CFE9FF' : 'transparent',
+            minHeight: 48,
             transform: [{
               scale: focusProgress.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.84, 1],
+                outputRange: [0.96, 1],
               }),
             }],
           }}
         >
-          <Ionicons
-            name={icon}
-            size={20}
-            color={focused ? colors.primary : colors.muted}
-          />
-        </Animated.View>
-        <Animated.Text
-          numberOfLines={1}
-          className={`mt-0.5 text-[8px] ${
-            focused ? 'font-extrabold text-primary' : 'font-medium text-muted'
-          }`}
-          style={{
-            opacity: focusProgress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.78, 1],
-            }),
-            transform: [{
-              translateY: focusProgress.interpolate({
+          <View
+            className="h-7 w-7 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: focused ? '#FFFFFF' : 'transparent',
+              shadowColor: focused ? colors.primary : '#000000',
+              shadowOpacity: focused ? 0.12 : 0,
+              shadowRadius: focused ? 8 : 0,
+              elevation: focused ? 2 : 0,
+            }}
+          >
+            <Ionicons
+              name={icon}
+              size={20}
+              color={focused ? colors.primary : colors.muted}
+            />
+          </View>
+          <Animated.Text
+            numberOfLines={1}
+            className={`mt-1 text-[8.5px] ${
+              focused ? 'font-extrabold text-primary' : 'font-semibold text-muted'
+            }`}
+            style={{
+              opacity: focusProgress.interpolate({
                 inputRange: [0, 1],
-                outputRange: [2, 0],
+                outputRange: [0.7, 1],
               }),
-            }],
-          }}
-        >
-          {label}
-        </Animated.Text>
+              transform: [{
+                translateY: focusProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [2, 0],
+                }),
+              }],
+            }}
+          >
+            {label}
+          </Animated.Text>
+        </Animated.View>
       </Animated.View>
     </Pressable>
   );
